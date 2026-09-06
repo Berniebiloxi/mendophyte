@@ -12,7 +12,7 @@ export function SessionPanel() {
   const [preflight, setPreflight] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [projects, setProjects] = useState<{ name: string; artifactHome: string; modified: string; repoDir: string | null }[]>([]);
+  const [projects, setProjects] = useState<{ name: string; artifactHome: string; modified: string; repoDir: string | null; repoDirSource?: string | null }[]>([]);
 
   const loadProjects = () => api.projects().then((p) => setProjects(p.projects)).catch(() => setProjects([]));
   useEffect(() => {

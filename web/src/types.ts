@@ -10,6 +10,7 @@ export type { DiffReport } from "../../src/orchestrator/git-diff.js";
 export type { ArtifactEntry } from "../../src/orchestrator/preflight/local.js";
 export type { FileEntry, FileListing, FileContent } from "../../src/orchestrator/files.js";
 export type { TerminalInfo } from "../../src/server/terminals.js";
+export type { ProjectInfo, RepoDirSource } from "../../src/server/projects.js";
 export type { SubmissionReport, CiStatus, CiCheck, TemplateItem } from "../../src/orchestrator/submission.js";
 export type { FeedbackEntry, FeedbackLog } from "../../src/orchestrator/feedback-log.js";
 export type { BenchRun, BenchSample, BenchDetection, BenchComparison } from "../../src/orchestrator/benchmark.js";

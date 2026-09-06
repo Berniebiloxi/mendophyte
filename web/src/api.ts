@@ -1,3 +1,4 @@
+import type { ProjectInfo } from "./types.js";
 import type { ArtifactEntry, BenchComparison, BenchDetection, BenchRun, DetectionReport, DiffReport, FeedbackEntry, FeedbackLog, FileContent, FileListing, FragilityReport, PreflightReport, SessionEvent, SessionSummary, SubmissionReport, TerminalInfo, VerificationRun } from "./types.js";
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -27,7 +28,8 @@ export const api = {
   moveProject: (name: string, to: string) => call<{ ok: true; artifactHome: string }>("POST", `/projects/${encodeURIComponent(name)}/move`, { to }),
   deleteProject: (name: string) => call<{ ok: true }>("DELETE", `/projects/${encodeURIComponent(name)}`),
   health: () => call<{ status: string; sessions: number; pendingApprovals: number }>("GET", "/health"),
-  projects: () => call<{ projects: { name: string; artifactHome: string; modified: string; repoDir: string | null; repoUrl: string | null; model: string | null; lastSessionAt: string | null }[] }>("GET", "/projects"),
+  projects: () => call<{ projects: ProjectInfo[] }>("GET", "/projects"),
+  locateProject: (name: string, repoDir: string) => call<{ project: ProjectInfo }>("POST", `/projects/${encodeURIComponent(name)}/locate`, { repoDir }),
   sessions: () => call<{ sessions: SessionSummary[] }>("GET", "/sessions"),
   createSession: (b: CreateSessionBody) => call<{ session: SessionSummary }>("POST", "/sessions", b),
   send: (id: string, text: string) => call<{ ok: true }>("POST", `/sessions/${id}/messages`, { text }),

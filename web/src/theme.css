@@ -899,7 +899,8 @@ pre.out, .md pre, .modal .cmd { border-radius: 0.625rem; box-shadow: var(--m-cla
 .md img { max-width: 100%; }
 
 /* spine labels: a halo so nothing drawn behind can cut through the text */
-.spine .label, .spine .budlabel { paint-order: stroke fill; stroke: var(--m-panel); stroke-width: 4px; stroke-linejoin: round; }
+.spine .label { paint-order: stroke fill; stroke: var(--m-panel); stroke-width: 4px; stroke-linejoin: round; }
+.spine .budlabel { paint-order: stroke fill; stroke: var(--m-panel); stroke-width: 2px; stroke-linejoin: round; }
 
 /* ---- round four -------------------------------------------------------- */
 .modal.plain { border-top: 1px solid var(--m-group-border); width: min(46rem, 94vw); }

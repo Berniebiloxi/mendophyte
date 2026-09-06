@@ -8,6 +8,7 @@ import { SessionManager, type SessionFactory } from "./session-manager.js";
 import { TerminalManager } from "./terminals.js";
 import { attachWebSockets } from "./ws.js";
 import { DiagnosticLog, NULL_LOG, brief, type DiagEntry, type DiagSource } from "./diag.js";
+import { VERSION } from "../version.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -122,7 +123,7 @@ export async function createMendophyteServer(opts: { port: number; host?: string
   });
 
   app.get("/api/health", (_req, res) => {
-    res.json({ status: "ok", name: "mendophyte", version: "0.1.0", pid: process.pid, startedAt, sessions: manager.list().length, pendingApprovals: manager.pendingApprovals().length });
+    res.json({ status: "ok", name: "mendophyte", version: VERSION, pid: process.pid, startedAt, sessions: manager.list().length, pendingApprovals: manager.pendingApprovals().length });
   });
   app.post("/api/shutdown", (_req, res) => {
     res.json({ ok: true, pid: process.pid });

@@ -146,7 +146,7 @@ export function SpinePanel() {
                         Artifact {b} · {ARTIFACT_NAMES[b]} {open ? "(present)" : "(not yet)"}
                       </title>
                     </circle>
-                    <text className="budlabel" x={bx - 3} y={by + 14}>
+                    <text className="budlabel" x={bx - 3} y={by + 17}>
                       {b}
                     </text>
                   </g>

@@ -34,6 +34,7 @@ import {
 } from "../orchestrator/index.js";
 import { NotFoundError, ValidationError, defaultArtifactHome, type SessionManager } from "./session-manager.js";
 import { buildSnapshot, writeSnapshot } from "./snapshot.js";
+import { listProjects, locateProject, projectsRoot as projRoot } from "./projects.js";
 import { mkdir, realpath, rename, rm } from "node:fs/promises";
 import { TerminalError, hostInfo, ptyLoadError, type TerminalManager } from "./terminals.js";
 
@@ -52,41 +53,34 @@ export function apiRoutes(manager: SessionManager, terminals: TerminalManager): 
     };
 
   // ---- prior projects: one artifact home per repository under ~/.mendophyte
-  r.get(
-    "/projects",
-    wrap(async (_req, res) => {
-      const root = path.join(os.homedir(), ".mendophyte");
-      const projects: { name: string; artifactHome: string; modified: string; repoDir: string | null; repoUrl: string | null; model: string | null; lastSessionAt: string | null }[] = [];
-      try {
-        for (const name of await readdir(root)) {
-          const p = path.join(root, name);
-          const st = await stat(p).catch(() => null);
-          if (st?.isDirectory() && name !== "logs") {
-            let info: { repoDir?: string; repoUrl?: string | null; model?: string | null; lastSessionAt?: string } = {};
-            try {
-              info = JSON.parse(await readFile(path.join(p, "project.json"), "utf8"));
-            } catch {
-              /* older home without a record */
-            }
-            projects.push({ name, artifactHome: p, modified: st.mtime.toISOString(), repoDir: info.repoDir ?? null, repoUrl: info.repoUrl ?? null, model: info.model ?? null, lastSessionAt: info.lastSessionAt ?? null });
-          }
-        }
-      } catch {
-        /* no ~/.mendophyte yet */
-      }
-      projects.sort((a, b) => b.modified.localeCompare(a.modified));
-      res.json({ projects });
-    })
-  );
-
-  // Managing artifact homes: rename and delete stay inside ~/.mendophyte; move may go anywhere
-  // the user names. A home that a live session is using cannot be touched.
-  const projectsRoot = () => path.join(os.homedir(), ".mendophyte");
   const safeName = (n: unknown): string => {
     const s = String(n ?? "").trim();
     if (!s || s === "." || s === ".." || /[\\/]/.test(s) || s === "logs") throw new ValidationError("project name must be a single folder name (not 'logs')");
     return s;
   };
+  r.get(
+    "/projects",
+    wrap(async (_req, res) => {
+      res.json({ projects: await listProjects() });
+    })
+  );
+  // The user points an older home at its clone.
+  r.post(
+    "/projects/:name/locate",
+    wrap(async (req, res) => {
+      const home = path.join(projRoot(), safeName(req.params.name));
+      if (!(await stat(home).catch(() => null))?.isDirectory()) throw new NotFoundError("no such project");
+      try {
+        res.json({ project: await locateProject(home, String(req.body?.repoDir ?? "")) });
+      } catch (e) {
+        throw new ValidationError(e instanceof Error ? e.message : String(e));
+      }
+    })
+  );
+
+  // Managing artifact homes: rename and delete stay inside ~/.mendophyte; move may go anywhere
+  // the user names. A home that a live session is using cannot be touched.
+  const projectsRoot = () => projRoot();
   const inUse = (home: string) => manager.list().some((s) => s.artifactHome === home && s.status !== "ended" && s.status !== "error");
   r.post(
     "/projects/:name/rename",

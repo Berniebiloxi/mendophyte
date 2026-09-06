@@ -120,7 +120,7 @@ export function Menubar({ api }: { api: DockviewApi | null }) {
     {dialog === "open" && <OpenProjectDialog onClose={() => setDialog(null)} onOther={() => api && showPanel(api, "session")} />}
     {dialog === "layouts" && api && <LayoutsDialog api={api} onClose={() => setDialog(null)} />}
     <div className="menubar" ref={barRef}>
-      <span className="wordmark" title="Mendophyte">
+      <span className="wordmark" title={`Mendophyte ${__MENDOPHYTE_VERSION__}`}>
         <svg viewBox="0 0 120 64" aria-hidden="true">
           <path d="M4 56 C 30 56, 30 20, 56 20 S 90 44, 116 12" />
           <circle cx="56" cy="20" r="4" />
@@ -219,7 +219,7 @@ export function Menubar({ api }: { api: DockviewApi | null }) {
             <button role="menuitemcheckbox" aria-checked={!!api?.getPanel("debug")} onClick={() => { togglePanel("debug"); close(); }}><span><Check on={!!api?.getPanel("debug")} />Debug log</span> <span className="kbd">for bug reports</span></button>
             <hr />
             <button onClick={() => { window.open("https://github.com/anthropics/claude-agent-sdk-typescript", "_blank"); close(); }}>Agent SDK docs</button>
-            <button onClick={() => { alert("Mendophyte 0.1.0\nLocal cockpit for AI-assisted open-source contribution work."); close(); }}>About</button>
+            <button onClick={() => { alert(`Mendophyte ${__MENDOPHYTE_VERSION__}\nLocal cockpit for AI-assisted open-source contribution work.`); close(); }}>About</button>
           </>
         )}
       </Menu>

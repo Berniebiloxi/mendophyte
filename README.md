@@ -112,9 +112,16 @@ layouts…** saves the current arrangement under a name and lets you load,
 overwrite, rename or delete saved ones. Layouts live in the browser.
 
 **Open project.** **File → Open project…** lists the repositories
-Mendophyte has worked on (each artifact home keeps a `project.json` with
-its clone path) and starts a new session on one; the agent reads the
-notes it left there and asks how to continue.
+Mendophyte has worked on and starts a new session on one; the agent
+reads the notes it left there and asks how to continue. Each artifact
+home keeps a `project.json` with its clone path. Homes from before that
+record existed are recovered from a saved snapshot or a benchmark run,
+or guessed by name in the usual code folders (shown as a guess), and
+**Locate…** lets you point at the clone yourself.
+
+**Versions.** The number in package.json is the only one; the health
+endpoint, the About box and the SDK client string read it. See
+`CHANGELOG.md` for what changed in each.
 
 **Interrupt.** **Edit → Interrupt agent** stops the current turn and
 dismisses anything the agent was waiting on (a question card, a

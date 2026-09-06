@@ -1,5 +1,6 @@
 import { EventEmitter } from "node:events";
 import { childEnv } from "./env.js";
+import { VERSION } from "../version.js";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -203,7 +204,7 @@ export class MendophyteSession extends EventEmitter {
 
     // childEnv strips the nesting guard and npm's lifecycle variables; see env.ts.
     const env: NodeJS.ProcessEnv = childEnv(c.env ?? {});
-    env.CLAUDE_AGENT_SDK_CLIENT_APP ??= "mendophyte/0.1.0";
+    env.CLAUDE_AGENT_SDK_CLIENT_APP ??= `mendophyte/${VERSION}`;
 
     // Hard floor. Runs before deny/ask rules, permission mode and allow
     // rules, so a guardrail command is forced to prompt even if the session

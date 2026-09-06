@@ -1,4 +1,5 @@
 import { createSdkMcpServer, tool, type McpSdkServerConfigWithInstance } from "@anthropic-ai/claude-agent-sdk";
+import { VERSION } from "../version.js";
 import { z } from "zod";
 import { computeFragility, formatFragilityFacts, type FragilityReport } from "./fragility/index.js";
 import {
@@ -247,7 +248,7 @@ export function createMendophyteMcpServer(cfg: MendophyteToolsConfig): McpSdkSer
 
   return createSdkMcpServer({
     name: MENDOPHYTE_MCP_NAME,
-    version: "0.1.0",
+    version: VERSION,
     instructions:
       "Tools provided by Mendophyte, the local cockpit orchestrating this session. They return deterministic facts computed from the repository on disk; cite their output by the sources it names. A verification result from run_verification is the only thing you may call verified.",
     tools: [fragilityMap, detectTool, runTool, submissionTool, feedbackTool, benchmarkTool],
