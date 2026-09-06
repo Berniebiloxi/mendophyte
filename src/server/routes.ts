@@ -32,7 +32,7 @@ import {
   type CheckKind,
   type VerificationCheck,
 } from "../orchestrator/index.js";
-import { NotFoundError, defaultArtifactHome, type SessionManager } from "./session-manager.js";
+import { NotFoundError, ValidationError, defaultArtifactHome, type SessionManager } from "./session-manager.js";
 import { TerminalError, hostInfo, ptyLoadError, type TerminalManager } from "./terminals.js";
 
 /**
@@ -268,6 +268,7 @@ export function apiRoutes(manager: SessionManager, terminals: TerminalManager): 
         kickoff: b.kickoff,
         noKickoff: b.noKickoff,
         promptDir: b.promptDir,
+        allowNonGit: b.allowNonGit,
       });
       res.status(201).json({ session: summary });
     })
@@ -472,6 +473,7 @@ export function apiRoutes(manager: SessionManager, terminals: TerminalManager): 
   // ---- errors
   r.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     if (err instanceof NotFoundError) return res.status(404).json({ error: err.message });
+    if (err instanceof ValidationError) return res.status(400).json({ error: err.message });
     if (err instanceof FileAccessError) return res.status(err.message === "not found" ? 404 : 400).json({ error: err.message });
     if (err instanceof TerminalError) return res.status(err.message.startsWith("at most") ? 429 : 503).json({ error: err.message });
     if (err instanceof FeedbackLogError) return res.status(err.message.startsWith("no entry") ? 404 : 400).json({ error: err.message });

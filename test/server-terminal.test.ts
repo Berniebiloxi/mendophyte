@@ -60,7 +60,7 @@ test("server: terminal create, io, resize, scrollback replay, kill", { skip: !lo
     const host = await api("GET", "/terminals/host");
     assert.equal(host.json.ptyError, null);
 
-    const created = await api("POST", "/sessions", { repoDir: base, preflight: false, noKickoff: true, artifactHome: path.join(base, "art") });
+    const created = await api("POST", "/sessions", { repoDir: base, preflight: false, noKickoff: true, artifactHome: path.join(base, "art"), allowNonGit: true });
     const sid = created.json.session.id;
 
     assert.equal((await api("GET", `/sessions/${sid}/terminals`)).json.terminals.length, 0);

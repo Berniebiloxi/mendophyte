@@ -52,7 +52,7 @@ export function SessionPanel() {
             {s.status === "running" && <button className="btn sm" onClick={() => api.end(s.id).catch((e) => store.toast(e.message))}>End</button>}
             <button className="btn sm" onClick={() => confirm("Force-close and forget this session?") && api.remove(s.id).catch((e) => store.toast(e.message))}>Close</button>
           </div>
-          {s.lastError && <div className="tag bad" style={{ marginTop: 6 }}>{s.lastError}</div>}
+          {s.lastError && <div className="tag bad" style={{ marginTop: 6, whiteSpace: "normal", lineHeight: 1.4, padding: "6px 10px" }}>{s.lastError}</div>}
         </div>
       ))}
 
@@ -73,7 +73,7 @@ export function SessionPanel() {
       <div className="row">
         <label className="field grow">
           Model (blank = your Claude Code default)
-          <input type="text" value={model} onChange={(e) => setModel(e.target.value)} placeholder="opus / sonnet / haiku" />
+          <input type="text" value={model} onChange={(e) => setModel(e.target.value)} placeholder="sonnet, opus, haiku, or a full model id" />
         </label>
         <label className="field grow">
           Artifact home (blank = ~/.mendophyte/&lt;repo&gt;)
@@ -83,7 +83,7 @@ export function SessionPanel() {
       <label className="row" style={{ fontSize: 12 }}>
         <input type="checkbox" checked={preflight} onChange={(e) => setPreflight(e.target.checked)} /> Run Phase 0 pre-flight checks and hand them to the agent
       </label>
-      {error && <div className="tag bad">{error}</div>}
+      {error && <div className="tag bad" style={{ whiteSpace: "normal", lineHeight: 1.4, padding: "6px 10px" }}>{error}</div>}
       <div className="row">
         <button className="btn primary" disabled={!repoDir.trim() || busy} onClick={create}>
           {busy ? "Starting…" : "Start session"}

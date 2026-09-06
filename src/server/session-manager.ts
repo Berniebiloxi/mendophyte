@@ -1,7 +1,8 @@
 import { EventEmitter } from "node:events";
 import { randomUUID } from "node:crypto";
 import { watch, type FSWatcher } from "node:fs";
-import { mkdir } from "node:fs/promises";
+import { mkdir, stat } from "node:fs/promises";
+import { run } from "../orchestrator/preflight/run.js";
 import os from "node:os";
 import path from "node:path";
 import { listArtifactHome, type ArtifactEntry } from "../orchestrator/preflight/local.js";
@@ -121,6 +122,8 @@ export interface CreateSessionInput {
   /** Start the session but send nothing. */
   noKickoff?: boolean;
   promptDir?: string;
+  /** Accept a directory that is not a git repository (the meta-prompt assumes a clone; tests and odd cases only). */
+  allowNonGit?: boolean;
 }
 
 export interface ManagerEvents {
@@ -294,6 +297,8 @@ export class SessionManager extends EventEmitter {
 
   async create(input: CreateSessionInput): Promise<SessionSummary> {
     const repoDir = path.resolve(input.repoDir);
+    await assertRepoDir(repoDir, input.allowNonGit);
+    const model = normalizeModel(input.model);
     const artifactHome = path.resolve(input.artifactHome ?? defaultArtifactHome(repoDir));
     await mkdir(artifactHome, { recursive: true });
     const promptDir = input.promptDir ?? defaultPromptDir();
@@ -314,7 +319,7 @@ export class SessionManager extends EventEmitter {
       artifactHome,
       promptDir,
       approvals: broker,
-      model: input.model,
+      model,
       maxTurns: input.maxTurns,
     };
     const session = this.factory(config);
@@ -324,7 +329,7 @@ export class SessionManager extends EventEmitter {
       repoDir,
       artifactHome,
       repoUrl,
-      model: input.model ?? null,
+      model: model ?? null,
       sdkSessionId: null,
       status: "starting",
       createdAt: new Date().toISOString(),
@@ -454,7 +459,15 @@ export class SessionManager extends EventEmitter {
       this.record(entry, "init", info);
       updated();
     });
-    session.on("assistant_text", (text: string) => this.record(entry, "assistant_text", { text }));
+    session.on("assistant_text", (text: string) => {
+      this.record(entry, "assistant_text", { text });
+      // Claude Code reports a bad model choice as an assistant message and ends the
+      // turn at zero cost; make it a visible session error rather than chat to read.
+      if (/issue with the selected model/i.test(text)) {
+        summary.lastError = `${text.trim()} Set the model to sonnet, opus or haiku (no slash), or leave it blank for your Claude Code default, then start a new session.`;
+        updated();
+      }
+    });
     session.on("tool_use", (t: { name: string; input: unknown; id: string }) => this.record(entry, "tool_use", t));
     session.on("tool_allowed", (t: { toolName: string; input: Record<string, unknown> }) => this.record(entry, "tool_allowed", t));
     session.on("state", (s: SessionState) => {
@@ -522,3 +535,40 @@ export class SessionManager extends EventEmitter {
 }
 
 export class NotFoundError extends Error {}
+export class ValidationError extends Error {}
+
+/** Known Claude Code model aliases; anything else is passed through as a full model id. */
+const MODEL_ALIASES = ["sonnet", "opus", "haiku", "fable", "default"];
+
+/**
+ * People type models the way Claude Code's slash command shows them
+ * ("/Sonnet", " Opus"). Claude Code wants the bare alias or a full id.
+ */
+export function normalizeModel(input: string | undefined | null): string | undefined {
+  if (input == null) return undefined;
+  let m = String(input).trim().replace(/^\/+/, "").trim();
+  if (!m) return undefined;
+  if (/^model\s+/i.test(m)) m = m.replace(/^model\s+/i, "").trim();
+  const lower = m.toLowerCase();
+  if (MODEL_ALIASES.includes(lower)) return lower === "default" ? undefined : lower;
+  return m;
+}
+
+async function assertRepoDir(repoDir: string, allowNonGit?: boolean): Promise<void> {
+  let st;
+  try {
+    st = await stat(repoDir);
+  } catch {
+    throw new ValidationError(`${repoDir} does not exist. Paste the absolute path of your local clone of the target project.`);
+  }
+  if (!st.isDirectory()) throw new ValidationError(`${repoDir} is not a directory.`);
+  if (allowNonGit) return;
+  const r = await run("git", ["rev-parse", "--show-toplevel"], { cwd: repoDir, timeoutMs: 10_000 });
+  if (!r.ok) {
+    throw new ValidationError(`${repoDir} is not a git repository. Mendophyte works on a local clone of the project you want to contribute to (run \`git clone <url>\` first, then point it at that directory).`);
+  }
+  const top = r.stdout.trim();
+  if (top && path.resolve(top) !== repoDir) {
+    throw new ValidationError(`${repoDir} is inside the repository ${top}; use the repository root.`);
+  }
+}

@@ -103,13 +103,24 @@ test("server bridge: REST + websocket round trip with a fake session", async () 
     const snap = await next((m) => m.type === "snapshot");
     assert.deepEqual(snap.sessions, []);
 
-    // Create: preflight off, scripted kickoff.
-    const created = await api("POST", "/sessions", { repoDir: tmp, artifactHome: path.join(tmp, "art"), preflight: false, kickoff: "hello agent" });
+    // Input validation: the repo path must exist and be a git repository; the model is normalised.
+    const missing = await api("POST", "/sessions", { repoDir: path.join(tmp, "nope"), preflight: false });
+    assert.equal(missing.status, 400);
+    assert.match(missing.json.error, /does not exist/);
+    const notGit = await api("POST", "/sessions", { repoDir: tmp, preflight: false });
+    assert.equal(notGit.status, 400);
+    assert.match(notGit.json.error, /not a git repository/);
+    assert.equal(fakes.length, 0, "no session is created for invalid input");
+
+    // Create: preflight off, scripted kickoff, non-git allowed for the fake.
+    const created = await api("POST", "/sessions", { repoDir: tmp, artifactHome: path.join(tmp, "art"), preflight: false, kickoff: "hello agent", allowNonGit: true, model: " /Sonnet " });
     assert.equal(created.status, 201, JSON.stringify(created.json));
     const id = created.json.session.id as string;
     assert.equal(fakes.length, 1);
     assert.deepEqual(fakes[0].sent, ["hello agent"]);
     assert.equal(fakes[0].config.artifactHome, path.join(tmp, "art"));
+    assert.equal(fakes[0].config.model, "sonnet", "slash-command style model input is normalised");
+    assert.equal(created.json.session.model, "sonnet");
 
     await next((m) => m.type === "session.created" && m.session.id === id);
     const init = await next((m) => m.type === "session.event" && m.event === "init");
