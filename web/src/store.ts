@@ -45,6 +45,8 @@ export interface UiState {
   termFontSize: number;
   /** Global UI size: "auto" picks from the screen, otherwise a multiplier (1 = 100%). */
   uiScale: UiScale;
+  /** Apply the workflow preset that matches the agent's phase as it changes. */
+  layoutFollowsPhase: boolean;
   toast: string | null;
 }
 
@@ -68,7 +70,7 @@ export function effectiveUiScale(s: UiScale): number {
 }
 
 const EVENT_CAP = 1500;
-const LS = { theme: "mendophyte.theme", scheme: "mendophyte.scheme", active: "mendophyte.activeSession", termFont: "mendophyte.termFontSize", uiScale: "mendophyte.uiScale" };
+const LS = { theme: "mendophyte.theme", scheme: "mendophyte.scheme", active: "mendophyte.activeSession", termFont: "mendophyte.termFontSize", uiScale: "mendophyte.uiScale", follow: "mendophyte.layoutFollowsPhase" };
 
 class Store {
   state: UiState;
@@ -92,8 +94,15 @@ class Store {
       scheme: (safeGet(LS.scheme) as SchemeName) || "auto",
       termFontSize: Number(safeGet(LS.termFont)) || 13,
       uiScale: readScale(safeGet(LS.uiScale)),
+      layoutFollowsPhase: safeGet(LS.follow) === "1",
       toast: null,
     };
+  }
+
+  setLayoutFollowsPhase(on: boolean) {
+    diag(`layout follows phase: ${on}`);
+    safeSet(LS.follow, on ? "1" : "0");
+    this.set({ layoutFollowsPhase: on });
   }
 
   setUiScale(scale: UiScale) {

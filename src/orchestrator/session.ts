@@ -320,7 +320,15 @@ export class MendophyteSession extends EventEmitter {
       }
       this.emit("end");
     } catch (e) {
-      this.emit("error", e instanceof Error ? e : new Error(String(e)));
+      const err = e instanceof Error ? e : new Error(String(e));
+      // When the input is closed after a turn that ended in an error result (an
+      // interrupt does that), the SDK rethrows that old result on exit. The turn
+      // was already reported; the session itself ended cleanly.
+      if (this.inputClosed && /returned an error result/i.test(err.message)) {
+        this.emit("end");
+        return;
+      }
+      this.emit("error", err);
       this.emit("end");
     }
   }

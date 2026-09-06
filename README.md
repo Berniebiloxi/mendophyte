@@ -105,6 +105,23 @@ brackets the time the model API itself took (hover the line for the
 breakdown). The rest is tool execution and process overhead. The same
 numbers land in the debug log as `latency:` entries.
 
+**Layouts.** **View → Layout** has workflow presets (Overview, Orientation,
+Triage, Fix, Submission, Focus) and **Follow the phase**, which applies
+the matching preset as the agent moves through the process. **Manage
+layouts…** saves the current arrangement under a name and lets you load,
+overwrite, rename or delete saved ones. Layouts live in the browser.
+
+**Open project.** **File → Open project…** lists the repositories
+Mendophyte has worked on (each artifact home keeps a `project.json` with
+its clone path) and starts a new session on one; the agent reads the
+notes it left there and asks how to continue.
+
+**Interrupt.** **Edit → Interrupt agent** stops the current turn and
+dismisses anything the agent was waiting on (a question card, a
+confirmation). It is greyed out when the agent is idle, because there is
+nothing to stop. An interrupted turn shows as "stopped by you" in the
+conversation; the session continues with your next message.
+
 **Snapshots.** **File → Save snapshot** writes a Markdown record of the
 session (conversation, last dashboard state, verification runs,
 submission) into the artifact home under `snapshots/`; **File → Export

@@ -63,7 +63,9 @@ export async function listArtifactHome(artifactHome: string): Promise<{ exists: 
     return { exists: false, entries: [] };
   }
   const entries: ArtifactEntry[] = [];
-  for (const name of names.sort()) {
+  // Mendophyte's own bookkeeping in the home is not an artifact.
+  const own = new Set(["project.json", ".DS_Store"]);
+  for (const name of names.filter((n) => !own.has(n)).sort()) {
     try {
       const st = await stat(path.join(artifactHome, name));
       entries.push({ name, bytes: st.size, modified: st.mtime.toISOString(), isDir: st.isDirectory() });

@@ -3,8 +3,8 @@ import { DockviewReact } from "dockview-react";
 import type { DockviewApi, DockviewReadyEvent, DockviewTheme, IDockviewPanelProps } from "dockview";
 import { Menubar } from "./Menubar.js";
 import { ApprovalsModal } from "./ApprovalsModal.js";
-import { buildDefaultLayout, restoreLayout, saveLayout } from "./layout.js";
-import { useUi } from "./store.js";
+import { applyPreset, buildDefaultLayout, presetForPhase, restoreLayout, saveLayout } from "./layout.js";
+import { useActiveSession, useUi } from "./store.js";
 import { SessionPanel } from "./panels/SessionPanel.js";
 import { SpinePanel } from "./panels/SpinePanel.js";
 import { YourTurnPanel } from "./panels/YourTurnPanel.js";
@@ -76,6 +76,20 @@ export function App() {
     });
     setApi(e.api);
   };
+
+  // Follow the phase: when the agent's phase changes, apply the matching workflow preset.
+  const follow = useUi((st) => st.layoutFollowsPhase);
+  const active = useActiveSession();
+  const phase = active ? (active.livePhase ?? active.lastState?.phase ?? null) : null;
+  const lastPreset = useRef<string | null>(null);
+  useEffect(() => {
+    if (!api || !follow) return;
+    const p = presetForPhase(phase);
+    if (p && p !== lastPreset.current) {
+      lastPreset.current = p;
+      applyPreset(api, p);
+    }
+  }, [api, follow, phase, active?.id]);
 
   useEffect(() => {
     const base = "Mendophyte";

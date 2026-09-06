@@ -204,6 +204,17 @@ test("server bridge: REST + websocket round trip with a fake session", async () 
     assert.equal((await api("GET", `/sessions/${id}`)).json.session.busy, true);
     assert.ok((await api("GET", `/sessions/${id}/events?after=0`)).json.events.some((e: any) => e.event === "user_text" && e.data.kickoff === true && e.data.text === "hello agent"));
 
+    // Interrupt while busy: dismisses anything pending and reports wasBusy; when idle it reports that too.
+    const pendingQ = fakes[0].config.questions!.request([{ question: "Blocked?", header: "Q", multiSelect: false, options: [{ label: "a", description: "" }] }]);
+    await next((m) => m.type === "question.pending");
+    const irq = await api("POST", `/sessions/${id}/interrupt`, {});
+    assert.equal(irq.status, 202);
+    assert.equal(irq.json.wasBusy, true);
+    assert.deepEqual(await pendingQ, { answered: false, reason: "Interrupted by the user." });
+    // the artifact home remembers its clone for Open project…
+    const projRec = JSON.parse(await (await import("node:fs/promises")).readFile(path.join(tmp, "art", "project.json"), "utf8"));
+    assert.equal(projRec.repoDir, fakes[0].config.repoDir);
+
     // Streamed text arrives as a draft frame (not buffered), then the full text as an event.
     fakes[0].emit("assistant_delta", "Read");
     fakes[0].emit("assistant_delta", "ing…");
@@ -221,6 +232,7 @@ test("server bridge: REST + websocket round trip with a fake session", async () 
     assert.ok(turn.data.timing && turn.data.timing.wallMs >= 0 && turn.data.timing.firstTextMs >= 0, "turn carries timing");
     assert.equal((await api("GET", `/sessions/${id}`)).json.session.busy, false);
     assert.equal((await api("GET", `/sessions/${id}`)).json.session.lastTurn.wallMs, turn.data.timing.wallMs);
+    assert.equal((await api("POST", `/sessions/${id}/interrupt`, {})).json.wasBusy, false, "idle: nothing to interrupt");
     const s2 = await api("GET", `/sessions/${id}`);
     assert.equal(s2.json.session.lastState.your_turn_items[0].id, "q1");
 

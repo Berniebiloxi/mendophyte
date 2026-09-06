@@ -1,5 +1,5 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
-import { readdir, stat } from "node:fs/promises";
+import { readdir, readFile, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { listArtifactHome } from "../orchestrator/preflight/local.js";
@@ -56,12 +56,20 @@ export function apiRoutes(manager: SessionManager, terminals: TerminalManager): 
     "/projects",
     wrap(async (_req, res) => {
       const root = path.join(os.homedir(), ".mendophyte");
-      const projects: { name: string; artifactHome: string; modified: string }[] = [];
+      const projects: { name: string; artifactHome: string; modified: string; repoDir: string | null; repoUrl: string | null; model: string | null; lastSessionAt: string | null }[] = [];
       try {
         for (const name of await readdir(root)) {
           const p = path.join(root, name);
           const st = await stat(p).catch(() => null);
-          if (st?.isDirectory()) projects.push({ name, artifactHome: p, modified: st.mtime.toISOString() });
+          if (st?.isDirectory() && name !== "logs") {
+            let info: { repoDir?: string; repoUrl?: string | null; model?: string | null; lastSessionAt?: string } = {};
+            try {
+              info = JSON.parse(await readFile(path.join(p, "project.json"), "utf8"));
+            } catch {
+              /* older home without a record */
+            }
+            projects.push({ name, artifactHome: p, modified: st.mtime.toISOString(), repoDir: info.repoDir ?? null, repoUrl: info.repoUrl ?? null, model: info.model ?? null, lastSessionAt: info.lastSessionAt ?? null });
+          }
         }
       } catch {
         /* no ~/.mendophyte yet */
@@ -361,8 +369,8 @@ export function apiRoutes(manager: SessionManager, terminals: TerminalManager): 
   r.post(
     "/sessions/:id/interrupt",
     wrap(async (req, res) => {
-      await manager.interrupt(req.params.id);
-      res.status(202).json({ ok: true });
+      const r = await manager.interrupt(req.params.id);
+      res.status(202).json({ ok: true, ...r });
     })
   );
 

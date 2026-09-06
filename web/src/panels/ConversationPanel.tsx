@@ -38,10 +38,10 @@ const Entry = memo(function Entry({ e }: { e: AnyEvent }) {
       const secs = (ms: number) => `${(ms / 1000).toFixed(1)}s`;
       return (
         <div className="msg turn" title={t ? `From your message to the result: ${secs(t.wallMs)} wall clock, of which the model API took ${t.apiMs != null ? secs(t.apiMs) : "?"}. First streamed text after ${t.firstTextMs != null ? secs(t.firstTextMs) : "?"}. The gap between wall and API time is tool execution and process overhead.` : undefined}>
-          turn {d.subtype}
+          {d.interrupted ? "stopped by you" : `turn ${d.subtype}`}
           {t ? ` · ${secs(t.wallMs)}${t.apiMs != null ? ` (api ${secs(t.apiMs)})` : ""}` : ""}
           {d.total_cost_usd != null ? ` · ${Number(d.total_cost_usd).toFixed(3)} so far` : ""}
-          {d.stateError ? ` · no state: ${d.stateError}` : ""}
+          {d.stateError && !d.interrupted ? ` · no state: ${d.stateError}` : ""}
         </div>
       );
     }

@@ -113,3 +113,101 @@ export function showPanel(api: DockviewApi, id: PanelId): void {
   const ref = api.getPanel("conversation") ? "conversation" : api.panels[0]?.id;
   api.addPanel({ id, component: id, title: def.title, position: ref ? { referencePanel: ref, direction: id === "diff" ? "below" : "right" } : undefined });
 }
+
+// ---- workflow presets ---------------------------------------------------
+//
+// Each preset arranges the panels around one part of the process. "Follow
+// the phase" (a setting in the store) applies the matching preset as the
+// agent moves: 0-2 orient, 3 triage, 4 fix, 5 submit.
+
+export type PresetId = "overview" | "orient" | "triage" | "fix" | "submit" | "focus";
+export const PRESETS: { id: PresetId; title: string; hint: string; phases: number[] }[] = [
+  { id: "overview", title: "Overview", hint: "everything, the default", phases: [] },
+  { id: "orient", title: "Orientation", hint: "files, artifacts, capability", phases: [0, 1, 2] },
+  { id: "triage", title: "Triage", hint: "the board next to the conversation", phases: [3] },
+  { id: "fix", title: "Fix", hint: "diff, terminal, verification", phases: [4] },
+  { id: "submit", title: "Submission", hint: "PR status, feedback log, diff", phases: [5] },
+  { id: "focus", title: "Focus", hint: "conversation and your turn only", phases: [] },
+];
+
+export function presetForPhase(phase: number | null): PresetId | null {
+  if (phase === null) return null;
+  return PRESETS.find((p) => p.phases.includes(phase))?.id ?? null;
+}
+
+function add(api: DockviewApi, id: string, opts: { ref?: string; dir?: "left" | "right" | "above" | "below" | "within"; width?: number; height?: number; title?: string; component?: string } = {}) {
+  const def = PANELS.find((p) => p.id === id);
+  api.addPanel({
+    id,
+    component: opts.component ?? id,
+    title: opts.title ?? def?.title ?? id,
+    params: id.startsWith("terminal") ? {} : undefined,
+    position: opts.ref ? { referencePanel: opts.ref, direction: opts.dir ?? "within" } : undefined,
+    initialWidth: opts.width,
+    initialHeight: opts.height,
+  });
+}
+
+export function applyPreset(api: DockviewApi, preset: PresetId): void {
+  if (preset === "overview") return buildDefaultLayout(api);
+  const w = window.innerWidth || 1440;
+  const h = window.innerHeight || 900;
+  const side = Math.round(Math.max(240, Math.min(460, w * 0.2)));
+  const wide = Math.round(Math.max(320, Math.min(640, w * 0.3)));
+  const row = Math.round(Math.max(180, Math.min(420, h * 0.34)));
+  api.clear();
+  switch (preset) {
+    case "orient":
+      add(api, "conversation");
+      add(api, "files", { ref: "conversation", dir: "left", width: side });
+      add(api, "spine", { ref: "files", dir: "within" });
+      api.getPanel("files")?.api.setActive();
+      add(api, "capability", { ref: "files", dir: "below" });
+      add(api, "artifacts", { ref: "conversation", dir: "right", width: wide });
+      add(api, "yourturn", { ref: "artifacts", dir: "below", height: row });
+      break;
+    case "triage":
+      add(api, "conversation");
+      add(api, "spine", { ref: "conversation", dir: "left", width: side });
+      add(api, "triage", { ref: "conversation", dir: "right", width: wide });
+      add(api, "yourturn", { ref: "triage", dir: "below", height: row });
+      add(api, "artifacts", { ref: "conversation", dir: "within" });
+      api.getPanel("conversation")?.api.setActive();
+      break;
+    case "fix":
+      add(api, "conversation");
+      add(api, "files", { ref: "conversation", dir: "left", width: side });
+      add(api, "spine", { ref: "files", dir: "within" });
+      api.getPanel("files")?.api.setActive();
+      add(api, "diff", { ref: "conversation", dir: "right", width: wide });
+      add(api, "terminal:default", { ref: "diff", dir: "below", height: row, component: "terminal", title: "Terminal" });
+      add(api, "yourturn", { ref: "conversation", dir: "below", height: row });
+      add(api, "verification", { ref: "yourturn", dir: "within" });
+      api.getPanel("yourturn")?.api.setActive();
+      break;
+    case "submit":
+      add(api, "conversation");
+      add(api, "spine", { ref: "conversation", dir: "left", width: side });
+      add(api, "submission", { ref: "conversation", dir: "right", width: wide });
+      add(api, "feedback", { ref: "submission", dir: "within" });
+      api.getPanel("submission")?.api.setActive();
+      add(api, "yourturn", { ref: "submission", dir: "below", height: row });
+      add(api, "diff", { ref: "conversation", dir: "below", height: row });
+      add(api, "artifacts", { ref: "diff", dir: "within" });
+      api.getPanel("diff")?.api.setActive();
+      break;
+    case "focus":
+      add(api, "conversation");
+      add(api, "yourturn", { ref: "conversation", dir: "right", width: wide });
+      break;
+  }
+}
+
+export function renameNamedLayout(from: string, to: string): boolean {
+  const all = namedLayouts();
+  if (!(from in all) || to in all || !to.trim()) return false;
+  all[to] = all[from];
+  delete all[from];
+  localStorage.setItem(LS_NAMED, JSON.stringify(all));
+  return true;
+}

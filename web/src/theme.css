@@ -900,3 +900,12 @@ pre.out, .md pre, .modal .cmd { border-radius: 0.625rem; box-shadow: var(--m-cla
 
 /* spine labels: a halo so nothing drawn behind can cut through the text */
 .spine .label, .spine .budlabel { paint-order: stroke fill; stroke: var(--m-panel); stroke-width: 4px; stroke-linejoin: round; }
+
+/* ---- round four -------------------------------------------------------- */
+.modal.plain { border-top: 1px solid var(--m-group-border); width: min(46rem, 94vw); }
+.modal.plain h3 { margin-top: 0.5rem; }
+.preset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: 0.5rem; }
+.preset { display: flex; flex-direction: column; align-items: flex-start; gap: 0.15rem; text-align: left; padding: 0.6rem 0.75rem; border-radius: 0.75rem; border: 1px solid var(--m-group-border); background: var(--m-panel); box-shadow: var(--m-clay-btn); cursor: pointer; transition: transform var(--m-ease), box-shadow var(--m-ease), border-color var(--m-ease); }
+.preset:hover { transform: translateY(-1px); box-shadow: var(--m-clay-hover); border-color: var(--m-accent); }
+.preset .muted, .preset .faint { font-size: 0.72rem; }
+.menu > button { transition: background 60ms linear; }

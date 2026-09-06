@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import { randomUUID } from "node:crypto";
 import { watch, type FSWatcher } from "node:fs";
-import { mkdir, realpath, stat } from "node:fs/promises";
+import { mkdir, realpath, stat, writeFile } from "node:fs/promises";
 import { run } from "../orchestrator/preflight/run.js";
 import os from "node:os";
 import path from "node:path";
@@ -194,6 +194,8 @@ interface Entry {
   submissionBusy: boolean;
   turnStartedAt: number | null;
   firstTextAt: number | null;
+  /** Set when the user interrupts; the next result is then reported as "stopped by you". */
+  interruptedAt: number | null;
   /** Claude Code's cumulative session totals as of the previous result, to derive per-turn numbers. */
   prevApiMs: number;
   prevDurationMs: number;
@@ -364,6 +366,11 @@ export class SessionManager extends EventEmitter {
     await mkdir(artifactHome, { recursive: true });
     const promptDir = input.promptDir ?? defaultPromptDir();
     const id = randomUUID();
+    // Remember which clone this artifact home belongs to, so "Open project…" can reopen it.
+    writeFile(
+      path.join(artifactHome, "project.json"),
+      JSON.stringify({ repoDir, repoUrl: input.repoUrl ?? null, model: model ?? null, lastSessionAt: new Date().toISOString() }, null, 2)
+    ).catch(() => {});
 
     let report: PreflightReport | null = null;
     let facts: string | null = null;
@@ -414,7 +421,7 @@ export class SessionManager extends EventEmitter {
           }
         : null,
     };
-    const entry: Entry = { summary, session, broker, questions, turnStartedAt: null, firstTextAt: null, prevApiMs: 0, prevDurationMs: 0, draft: "", draftTimer: null, events: [], seq: 0, preflightFacts: facts, report, fragility: null, verificationDetected: null, verificationRuns: [], watcher: null, watchTimer: null, submission: null, submissionTimer: null, submissionIntervalSec: null, submissionBusy: false };
+    const entry: Entry = { summary, session, broker, questions, turnStartedAt: null, firstTextAt: null, interruptedAt: null, prevApiMs: 0, prevDurationMs: 0, draft: "", draftTimer: null, events: [], seq: 0, preflightFacts: facts, report, fragility: null, verificationDetected: null, verificationRuns: [], watcher: null, watchTimer: null, submission: null, submissionTimer: null, submissionIntervalSec: null, submissionBusy: false };
     this.entries.set(id, entry);
     this.wire(entry);
     this.watchArtifacts(entry);
@@ -461,8 +468,20 @@ export class SessionManager extends EventEmitter {
     } else entry.draftTimer = setTimeout(fire, 80);
   }
 
-  async interrupt(id: string): Promise<void> {
-    await this.mustGet(id).session.interrupt();
+  /**
+   * Stops the current turn. Anything the agent is blocked on in the UI (a
+   * question card, a confirmation) is dismissed so the blocked tool call
+   * returns and the interrupt can land. Returns whether a turn was running.
+   */
+  async interrupt(id: string): Promise<{ wasBusy: boolean }> {
+    const e = this.mustGet(id);
+    const wasBusy = e.summary.busy;
+    if (!wasBusy) return { wasBusy };
+    e.interruptedAt = Date.now();
+    e.questions.dismissAll("Interrupted by the user.");
+    e.broker.denyAll("Interrupted by the user.");
+    await e.session.interrupt();
+    return { wasBusy };
   }
 
   end(id: string): void {
@@ -607,6 +626,8 @@ export class SessionManager extends EventEmitter {
             costUsd: typeof r.total_cost_usd === "number" ? r.total_cost_usd : null,
           }
         : null;
+      const interrupted = entry.interruptedAt !== null && result.subtype === "error_during_execution";
+      entry.interruptedAt = null;
       entry.turnStartedAt = null;
       entry.draft = "";
       this.pushDraft(entry, true);
@@ -615,6 +636,7 @@ export class SessionManager extends EventEmitter {
       this.record(entry, "turn", {
         subtype: result.subtype,
         is_error: result.is_error,
+        interrupted,
         num_turns: result.num_turns,
         total_cost_usd: r.total_cost_usd ?? null,
         duration_ms: r.duration_ms ?? null,

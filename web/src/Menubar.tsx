@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { DockviewApi } from "dockview";
-import { PANELS, buildDefaultLayout, deleteNamedLayout, loadNamedLayout, namedLayouts, newTerminal, saveNamedLayout, showPanel } from "./layout.js";
+import { PANELS, PRESETS, applyPreset, loadNamedLayout, namedLayouts, newTerminal, showPanel } from "./layout.js";
+import { OpenProjectDialog } from "./dialogs/OpenProjectDialog.js";
+import { LayoutsDialog } from "./dialogs/LayoutsDialog.js";
 import { api as rest } from "./api.js";
 import { UI_SCALE_STEPS, autoUiScale, store, useActiveSession, useUi } from "./store.js";
 import { diag } from "./diag.js";
@@ -37,30 +39,26 @@ function SubMenu({ label, hint, children }: { label: string; hint?: React.ReactN
   );
 }
 
+/** Which top-level menu is open lives on the bar, so hovering another label while one is open switches at once. */
+const MenubarCtx = createContext<{ open: string | null; setOpen: (k: string | null) => void }>({ open: null, setOpen: () => {} });
+
 function Menu({ label, children }: { label: string; children: (close: () => void) => React.ReactNode }) {
-  const [open, setOpen] = useState(false);
+  const bar = useContext(MenubarCtx);
+  const open = bar.open === label;
   const [sub, setSub] = useState<string | null>(null);
   const subCtx = useMemo(() => ({ open: sub, setOpen: setSub }), [sub]);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const onDoc = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    document.addEventListener("mousedown", onDoc);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDoc);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
+  const close = () => { bar.setOpen(null); setSub(null); };
   return (
-    <div className={`menu${open ? " open" : ""}`} ref={ref}>
-      <button onClick={() => { setOpen((o) => !o); setSub(null); }}>{label}</button>
+    <div className={`menu${open ? " open" : ""}`}>
+      <button
+        onClick={() => { bar.setOpen(open ? null : label); setSub(null); }}
+        onMouseEnter={() => { if (bar.open !== null && bar.open !== label) { bar.setOpen(label); setSub(null); } }}
+      >
+        {label}
+      </button>
       {open && (
         <SubMenuCtx.Provider value={subCtx}>
-          <div className="menu-list" onMouseLeave={() => setSub(null)}>{children(() => { setOpen(false); setSub(null); })}</div>
+          <div className="menu-list" onMouseLeave={() => setSub(null)}>{children(close)}</div>
         </SubMenuCtx.Provider>
       )}
     </div>
@@ -68,6 +66,18 @@ function Menu({ label, children }: { label: string; children: (close: () => void
 }
 
 export function Menubar({ api }: { api: DockviewApi | null }) {
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const barCtx = useMemo(() => ({ open: openMenu, setOpen: setOpenMenu }), [openMenu]);
+  const barRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!openMenu) return;
+    const onDoc = (e: MouseEvent) => { if (!barRef.current?.contains(e.target as Node)) setOpenMenu(null); };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpenMenu(null);
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onDoc); document.removeEventListener("keydown", onKey); };
+  }, [openMenu]);
+  const [dialog, setDialog] = useState<"open" | "layouts" | null>(null);
   const connected = useUi((st) => st.connected);
   const nApprovals = useUi((st) => st.approvals.length);
   const nQuestions = useUi((st) => st.questions.length);
@@ -75,6 +85,7 @@ export function Menubar({ api }: { api: DockviewApi | null }) {
   const scheme = useUi((st) => st.scheme);
   const termFontSize = useUi((st) => st.termFontSize);
   const uiScale = useUi((st) => st.uiScale);
+  const followPhase = useUi((st) => st.layoutFollowsPhase);
   // Re-render when panels open/close so the checkmarks stay honest.
   const [, bump] = useState(0);
   useEffect(() => {
@@ -91,11 +102,24 @@ export function Menubar({ api }: { api: DockviewApi | null }) {
   };
   const openCount = api ? PANELS.filter((p) => api.getPanel(p.id)).length : 0;
   const active = useActiveSession();
-  const [layouts, setLayouts] = useState<string[]>(() => Object.keys(namedLayouts()));
-  const refreshLayouts = () => setLayouts(Object.keys(namedLayouts()));
+  const layoutsCount = Object.keys(namedLayouts()).length;
+  const busy = !!active?.busy && active.status === "running";
+  const interrupt = async () => {
+    if (!active) return;
+    try {
+      diag("interrupt requested from Edit menu");
+      const r = await rest.interrupt(active.id);
+      store.toast(r.wasBusy ? "Interrupt sent. The agent stops at its next step; anything it was waiting on is dismissed." : "Nothing to interrupt: the agent is idle.");
+    } catch (e) {
+      store.toast(e instanceof Error ? e.message : String(e));
+    }
+  };
 
   return (
-    <div className="menubar">
+    <MenubarCtx.Provider value={barCtx}>
+    {dialog === "open" && <OpenProjectDialog onClose={() => setDialog(null)} onOther={() => api && showPanel(api, "session")} />}
+    {dialog === "layouts" && api && <LayoutsDialog api={api} onClose={() => setDialog(null)} />}
+    <div className="menubar" ref={barRef}>
       <span className="wordmark" title="Mendophyte">
         <svg viewBox="0 0 120 64" aria-hidden="true">
           <path d="M4 56 C 30 56, 30 20, 56 20 S 90 44, 116 12" />
@@ -110,7 +134,7 @@ export function Menubar({ api }: { api: DockviewApi | null }) {
         {(close) => (
           <>
             <button onClick={() => { api && showPanel(api, "session"); close(); }}>New session… <span className="kbd">Session panel</span></button>
-            <button onClick={() => { api && showPanel(api, "session"); close(); }}>Open project… <span className="kbd">Session panel</span></button>
+            <button onClick={() => { setDialog("open"); close(); }}>Open project… <span className="kbd">a repo you worked on before</span></button>
             <hr />
             <button disabled={!active} onClick={() => { active && rest.end(active.id).catch((e) => store.toast(e.message)); close(); }}>End session (finish turn, exit)</button>
             <button disabled={!active} onClick={() => { if (active && confirm("Force-close this session? Pending approvals are denied.")) rest.remove(active.id).catch((e) => store.toast(e.message)); close(); }}>Close session</button>
@@ -128,8 +152,10 @@ export function Menubar({ api }: { api: DockviewApi | null }) {
       <Menu label="Edit">
         {(close) => (
           <>
-            <button disabled={!active} onClick={() => { active && rest.interrupt(active.id).catch((e) => store.toast(e.message)); close(); }}>Interrupt agent</button>
-            <button disabled>Find in artifacts…</button>
+            <button disabled={!busy} title={!active ? "No session" : busy ? "Stop the agent's current turn; it keeps the session and waits for your next message" : "The agent is idle: there is no turn to interrupt"} onClick={() => { void interrupt(); close(); }}>
+              Interrupt agent <span className="kbd">{!active ? "no session" : busy ? "working" : "idle"}</span>
+            </button>
+            <button disabled={!active} onClick={() => { if (api) { showPanel(api, "artifacts"); setTimeout(() => (document.querySelector('input[placeholder="find in this artifact"]') as HTMLInputElement | null)?.focus(), 50); } close(); }}>Find in artifacts… <span className="kbd">Artifacts panel</span></button>
           </>
         )}
       </Menu>
@@ -149,16 +175,19 @@ export function Menubar({ api }: { api: DockviewApi | null }) {
               <hr />
               <button onClick={() => { api && newTerminal(api); close(); }}><span><Check on={false} />New terminal</span> <span className="kbd">your shell in the clone</span></button>
             </SubMenu>
-            <SubMenu label="Layout" hint={layouts.length ? `${layouts.length} saved` : undefined}>
-              <button onClick={() => { api && buildDefaultLayout(api); close(); }}>Reset to default</button>
-              <button onClick={() => { const n = prompt("Layout name"); if (n && api) { saveNamedLayout(api, n); refreshLayouts(); } close(); }}>Save current as…</button>
-              {layouts.length > 0 && <hr />}
-              {layouts.map((n) => (
-                <button key={n} onClick={() => { api && loadNamedLayout(api, n); close(); }}>
-                  Load “{n}”
-                  <span className="kbd" onClick={(e) => { e.stopPropagation(); deleteNamedLayout(n); refreshLayouts(); }} title="delete">✕</span>
+            <SubMenu label="Layout" hint={layoutsCount ? `${layoutsCount} saved` : undefined}>
+              {PRESETS.map((p) => (
+                <button key={p.id} onClick={() => { api && applyPreset(api, p.id); diag(`layout preset ${p.id}`); close(); }}>
+                  <span>{p.title}</span> <span className="kbd">{p.hint}</span>
                 </button>
               ))}
+              <hr />
+              <button role="menuitemcheckbox" aria-checked={followPhase} onClick={() => store.setLayoutFollowsPhase(!followPhase)}><span><Check on={followPhase} />Follow the phase</span></button>
+              <hr />
+              {Object.keys(namedLayouts()).map((n) => (
+                <button key={n} onClick={() => { api && loadNamedLayout(api, n); diag(`layout load "${n}"`); close(); }}>Load “{n}”</button>
+              ))}
+              <button onClick={() => { setDialog("layouts"); close(); }}>Manage layouts… <span className="kbd">save, rename, delete</span></button>
             </SubMenu>
             <SubMenu label="Appearance" hint={`${theme} · ${scheme}`}>
               <button onClick={() => { store.setTheme("vine"); close(); }}><span><Check on={theme === "vine"} />Theme: Vine</span></button>
@@ -212,5 +241,6 @@ export function Menubar({ api }: { api: DockviewApi | null }) {
         </span>
       </div>
     </div>
+    </MenubarCtx.Provider>
   );
 }
