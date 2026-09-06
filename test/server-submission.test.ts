@@ -79,7 +79,9 @@ test("server: submission get/refresh/poll", { timeout: 60_000 }, async () => {
     const poll = await api("POST", `/sessions/${id}/submission/poll`, { intervalSec: 1 });
     assert.equal(poll.json.pollingSec, 15, "clamped to the 15s floor");
     const before = subEvents().length;
-    await new Promise((r) => setTimeout(r, 300));
+    // The first poll spawns several git processes; give slow runners (Windows) time, but not a fixed sleep.
+    const deadline = Date.now() + 15_000;
+    while (subEvents().length === before && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50));
     assert.ok(subEvents().length > before, "starting polling refreshes immediately");
     const stop = await api("POST", `/sessions/${id}/submission/poll`, { intervalSec: null });
     assert.equal(stop.json.pollingSec, null);
