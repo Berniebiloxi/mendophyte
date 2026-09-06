@@ -20,7 +20,9 @@ test("childEnv: strips npm lifecycle variables and the Claude Code nesting guard
     assert.equal(env.KEEP_ME, "yes");
     assert.equal(env.EXTRA, "x");
     assert.equal("GONE" in env, false);
-    assert.equal(env.PATH, process.env.PATH);
+    // process.env is case-insensitive on Windows (the real key is "Path"); a plain object is not
+    const pathKey = Object.keys(process.env).find((k) => k.toUpperCase() === "PATH")!;
+    assert.equal(env[pathKey], process.env[pathKey]);
   } finally {
     for (const k of Object.keys(process.env)) if (!(k in saved)) delete process.env[k];
     Object.assign(process.env, saved);
