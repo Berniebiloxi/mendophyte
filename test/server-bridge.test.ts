@@ -9,7 +9,8 @@ import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import os from "node:os";
 import path from "node:path";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, symlink } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
 import WebSocket from "ws";
 
 import { createMendophyteServer } from "../src/server/index.js";
@@ -112,6 +113,23 @@ test("server bridge: REST + websocket round trip with a fake session", async () 
     assert.match(notGit.json.error, /not a git repository/);
     assert.equal(fakes.length, 0, "no session is created for invalid input");
 
+    // A git repo reached through a symlinked path (macOS temp dirs work this way) is accepted;
+    // a subdirectory of a repo is refused with a pointer to the root.
+    if (process.platform !== "win32") {
+      const realRepo = path.join(tmp, "realrepo");
+      await mkdir(path.join(realRepo, "sub"), { recursive: true });
+      execFileSync("git", ["init", "-q"], { cwd: realRepo });
+      const link = path.join(tmp, "linkrepo");
+      await symlink(realRepo, link);
+      const viaLink = await api("POST", "/sessions", { repoDir: link, artifactHome: path.join(tmp, "art2"), preflight: false, noKickoff: true });
+      assert.equal(viaLink.status, 201, JSON.stringify(viaLink.json));
+      const sub = await api("POST", "/sessions", { repoDir: path.join(realRepo, "sub"), preflight: false, noKickoff: true });
+      assert.equal(sub.status, 400);
+      assert.match(sub.json.error, /use the repository root/);
+      await api("DELETE", `/sessions/${viaLink.json.session.id}`);
+      fakes.length = 0;
+    }
+
     // Create: preflight off, scripted kickoff, non-git allowed for the fake.
     const created = await api("POST", "/sessions", { repoDir: tmp, artifactHome: path.join(tmp, "art"), preflight: false, kickoff: "hello agent", allowNonGit: true, model: " /Sonnet " });
     assert.equal(created.status, 201, JSON.stringify(created.json));
@@ -123,14 +141,14 @@ test("server bridge: REST + websocket round trip with a fake session", async () 
     assert.equal(created.json.session.model, "sonnet");
 
     await next((m) => m.type === "session.created" && m.session.id === id);
-    const init = await next((m) => m.type === "session.event" && m.event === "init");
+    const init = await next((m) => m.type === "session.event" && m.event === "init" && m.sessionId === id);
     assert.equal(init.sessionId, id);
-    const running = await next((m) => m.type === "session.updated" && m.session.status === "running");
+    const running = await next((m) => m.type === "session.updated" && m.session.status === "running" && m.session.id === id);
     assert.equal(running.session.sdkSessionId, "sdk-123");
 
     // Plain command: no approval, just a tool_use event.
     await fakes[0].tryBash("git status");
-    const tu = await next((m) => m.type === "session.event" && m.event === "tool_use");
+    const tu = await next((m) => m.type === "session.event" && m.event === "tool_use" && m.sessionId === id);
     assert.equal(tu.data.input.command, "git status");
 
     // Guardrail command: pending approval on the socket and via REST; deny via REST.
@@ -166,7 +184,7 @@ test("server bridge: REST + websocket round trip with a fake session", async () 
     // Turn completes with state: summary reflects it, event carries it.
     const state = { phase: 0, phase_complete: false, your_turn_items: [{ id: "q1", kind: "answer_question", prompt: "Experience?", blocks: "none" }] };
     fakes[0].finishTurn(state);
-    const turn = await next((m) => m.type === "session.event" && m.event === "turn");
+    const turn = await next((m) => m.type === "session.event" && m.event === "turn" && m.sessionId === id);
     assert.equal(turn.data.state.phase, 0);
     const s2 = await api("GET", `/sessions/${id}`);
     assert.equal(s2.json.session.lastState.your_turn_items[0].id, "q1");

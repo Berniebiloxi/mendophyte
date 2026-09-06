@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import { randomUUID } from "node:crypto";
 import { watch, type FSWatcher } from "node:fs";
-import { mkdir, stat } from "node:fs/promises";
+import { mkdir, realpath, stat } from "node:fs/promises";
 import { run } from "../orchestrator/preflight/run.js";
 import os from "node:os";
 import path from "node:path";
@@ -567,8 +567,12 @@ async function assertRepoDir(repoDir: string, allowNonGit?: boolean): Promise<vo
   if (!r.ok) {
     throw new ValidationError(`${repoDir} is not a git repository. Mendophyte works on a local clone of the project you want to contribute to (run \`git clone <url>\` first, then point it at that directory).`);
   }
+  // Compare real paths: macOS temp dirs are symlinks (/var -> /private/var) and
+  // git prints forward slashes on Windows, so a string comparison misfires.
   const top = r.stdout.trim();
-  if (top && path.resolve(top) !== repoDir) {
-    throw new ValidationError(`${repoDir} is inside the repository ${top}; use the repository root.`);
+  if (top) {
+    const [a, b] = await Promise.all([realpath(repoDir).catch(() => repoDir), realpath(path.resolve(top)).catch(() => path.resolve(top))]);
+    const same = process.platform === "win32" ? a.toLowerCase() === b.toLowerCase() : a === b;
+    if (!same) throw new ValidationError(`${repoDir} is inside the repository ${top}; use the repository root.`);
   }
 }
