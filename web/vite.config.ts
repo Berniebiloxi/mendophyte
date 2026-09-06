@@ -15,6 +15,8 @@ export default defineConfig({
     outDir: path.resolve(here, "../public"),
     emptyOutDir: true,
     sourcemap: true,
+    // One bundle served from localhost (~265 kB gzipped: React, dockview, xterm). Not worth splitting yet.
+    chunkSizeWarningLimit: 1500,
   },
   server: {
     port: 5173,

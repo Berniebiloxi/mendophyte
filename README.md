@@ -51,9 +51,14 @@ the handoff.
 ```
 git clone https://github.com/Berniebiloxi/mendophyte.git
 cd mendophyte
-npm install          # also builds the server and the web app
+npm ci               # installs exactly the lockfile and builds server + web app
 npm start            # serves http://localhost:4317 and opens your browser
 ```
+
+(`npm install` works too; it may rewrite `package-lock.json` if your npm
+version differs, which is harmless. The "3 moderate severity
+vulnerabilities" note is the `qs` advisory reached through Express 4; no
+patched release exists yet, and the server only listens on localhost.)
 
 Then, in the browser:
 
