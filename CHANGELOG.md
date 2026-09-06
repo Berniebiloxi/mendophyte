@@ -5,6 +5,11 @@ batch of user-visible changes, the patch number with fixes only. The
 number lives in package.json and is read from there everywhere
 (health endpoint, SDK client string, MCP server, About box).
 
+## 0.4.1 — 2026-09-07
+
+- The prior-projects list could collapse to nothing in a short Session
+  tile (a scrolling flex child with min-height 0). It keeps its height.
+
 ## 0.4.0 — 2026-09-07
 
 - Session panel: prior projects sit above the new-session form, which

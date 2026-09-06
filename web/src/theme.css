@@ -871,7 +871,7 @@ pre.out, .md pre, .modal .cmd { border-radius: 0.625rem; box-shadow: var(--m-cla
 .submenu.open > button { background: var(--m-selection); }
 
 /* prior projects: a bounded, scrolling list with actions per row */
-.proj-list { max-height: 16rem; overflow: auto; border: 1px solid var(--m-group-border); border-radius: var(--m-radius-sm); padding: 0.25rem; box-shadow: var(--m-clay-in); }
+.proj-list { flex: none; max-height: 16rem; overflow: auto; border: 1px solid var(--m-group-border); border-radius: var(--m-radius-sm); padding: 0.25rem; box-shadow: var(--m-clay-in); }
 .proj-row { display: flex; align-items: center; gap: 0.6rem; padding: 0.4rem 0.5rem; border-radius: 0.5rem; font-size: 0.78rem; }
 .proj-row:hover { background: var(--m-selection); }
 .proj-row + .proj-row { border-top: 1px dashed var(--m-border); }
