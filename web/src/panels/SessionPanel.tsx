@@ -1,0 +1,108 @@
+import { useEffect, useState } from "react";
+import { api } from "../api.js";
+import { store, useUi } from "../store.js";
+
+export function SessionPanel() {
+  const { sessions, activeSessionId } = useUi();
+  const [repoDir, setRepoDir] = useState("");
+  const [repoUrl, setRepoUrl] = useState("");
+  const [model, setModel] = useState("");
+  const [artifactHome, setArtifactHome] = useState("");
+  const [preflight, setPreflight] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [projects, setProjects] = useState<{ name: string; artifactHome: string; modified: string }[]>([]);
+
+  useEffect(() => {
+    api.projects().then((p) => setProjects(p.projects)).catch(() => setProjects([]));
+  }, [sessions.length]);
+
+  const create = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await store.createSession({ repoDir, repoUrl: repoUrl || undefined, model: model || undefined, artifactHome: artifactHome || undefined, preflight });
+      setRepoDir("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="panel stack">
+      <h2>Sessions</h2>
+      {sessions.length === 0 && <div className="empty">No session yet. Point Mendophyte at a clone to begin.</div>}
+      {sessions.map((s) => (
+        <div key={s.id} className="card" style={{ borderColor: s.id === activeSessionId ? "var(--m-accent)" : undefined }}>
+          <div className="row" style={{ justifyContent: "space-between" }}>
+            <b title={s.repoDir}>{s.repoDir.split(/[\\/]/).pop()}</b>
+            <span className={`tag ${s.status === "running" ? "ok" : s.status === "error" ? "bad" : ""}`}>{s.status}</span>
+          </div>
+          <div className="faint mono" style={{ fontSize: 11 }}>{s.repoDir}</div>
+          <div className="row" style={{ marginTop: 6 }}>
+            {s.preflight && <span className="tag accent">tier {s.preflight.tier}</span>}
+            {s.lastState && <span className="tag">phase {s.lastState.phase}</span>}
+            {s.model && <span className="tag">{s.model}</span>}
+            {s.pendingApprovals > 0 && <span className="tag bad">{s.pendingApprovals} awaiting</span>}
+          </div>
+          <div className="row" style={{ marginTop: 8 }}>
+            {s.id !== activeSessionId && <button className="btn sm" onClick={() => store.setActive(s.id)}>Make active</button>}
+            {s.status === "running" && <button className="btn sm" onClick={() => api.end(s.id).catch((e) => store.toast(e.message))}>End</button>}
+            <button className="btn sm" onClick={() => confirm("Force-close and forget this session?") && api.remove(s.id).catch((e) => store.toast(e.message))}>Close</button>
+          </div>
+          {s.lastError && <div className="tag bad" style={{ marginTop: 6 }}>{s.lastError}</div>}
+        </div>
+      ))}
+
+      <h3>New session</h3>
+      <label className="field">
+        Repository clone (absolute path on this machine)
+        <input type="text" value={repoDir} onChange={(e) => setRepoDir(e.target.value)} placeholder="/home/me/src/some-project" list="projects" />
+        <datalist id="projects">
+          {projects.map((p) => (
+            <option key={p.artifactHome} value={p.name} />
+          ))}
+        </datalist>
+      </label>
+      <label className="field">
+        Repository URL (only if the clone has no origin yet)
+        <input type="text" value={repoUrl} onChange={(e) => setRepoUrl(e.target.value)} placeholder="https://github.com/owner/repo" />
+      </label>
+      <div className="row">
+        <label className="field grow">
+          Model (blank = your Claude Code default)
+          <input type="text" value={model} onChange={(e) => setModel(e.target.value)} placeholder="opus / sonnet / haiku" />
+        </label>
+        <label className="field grow">
+          Artifact home (blank = ~/.mendophyte/&lt;repo&gt;)
+          <input type="text" value={artifactHome} onChange={(e) => setArtifactHome(e.target.value)} />
+        </label>
+      </div>
+      <label className="row" style={{ fontSize: 12 }}>
+        <input type="checkbox" checked={preflight} onChange={(e) => setPreflight(e.target.checked)} /> Run Phase 0 pre-flight checks and hand them to the agent
+      </label>
+      {error && <div className="tag bad">{error}</div>}
+      <div className="row">
+        <button className="btn primary" disabled={!repoDir.trim() || busy} onClick={create}>
+          {busy ? "Starting…" : "Start session"}
+        </button>
+        <span className="faint">Pre-flight can take up to 20s when a forge probe times out.</span>
+      </div>
+
+      {projects.length > 0 && (
+        <>
+          <h3>Prior projects (artifact homes)</h3>
+          {projects.map((p) => (
+            <div key={p.artifactHome} className="row" style={{ fontSize: 12 }}>
+              <span className="grow">{p.name}</span>
+              <span className="faint">{new Date(p.modified).toLocaleDateString()}</span>
+              <span className="faint mono" title={p.artifactHome}>artifacts</span>
+            </div>
+          ))}
+        </>
+      )}
+    </div>
+  );
+}

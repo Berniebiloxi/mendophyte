@@ -1,0 +1,77 @@
+{
+  "name": "mendophyte",
+  "version": "0.1.0",
+  "description": "Local dev cockpit for AI-assisted open-source contribution work, built on the Claude Agent SDK.",
+  "type": "module",
+  "bin": {
+    "mendophyte": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "public",
+    "prompts"
+  ],
+  "engines": {
+    "node": ">=20.19"
+  },
+  "scripts": {
+    "dev": "tsx src/cli.ts",
+    "build": "tsc && vite build --config web/vite.config.ts",
+    "start": "node dist/cli.js",
+    "orchestrate": "tsx src/orchestrate-cli.ts",
+    "test": "tsx --test test/*.test.ts",
+    "test:live": "MENDOPHYTE_LIVE=1 tsx --test test/live/*.live.test.ts",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p web/tsconfig.json",
+    "preflight": "tsx src/preflight-cli.ts",
+    "fragility": "tsx src/fragility-cli.ts",
+    "verify": "tsx src/verify-cli.ts",
+    "build:server": "tsc",
+    "build:web": "vite build --config web/vite.config.ts",
+    "dev:web": "vite --config web/vite.config.ts",
+    "prepare": "npm run build"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.263",
+    "commander": "^12.1.0",
+    "express": "^4.19.2",
+    "node-pty": "^1.1.0",
+    "open": "^10.1.0",
+    "ws": "^8.21.3",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.14.10",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@types/ws": "^8.18.1",
+    "@vitejs/plugin-react": "^6.1.1",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
+    "dockview": "^8.2.0",
+    "dockview-react": "^8.2.0",
+    "marked": "^16.4.2",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "tsx": "^4.16.2",
+    "typescript": "^5.5.4",
+    "vite": "^8.2.2"
+  },
+  "keywords": [
+    "claude",
+    "agent-sdk",
+    "open-source",
+    "contribution",
+    "cockpit"
+  ],
+  "license": "MIT",
+  "author": "Bernie (https://github.com/Berniebiloxi)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Berniebiloxi/mendophyte.git"
+  },
+  "homepage": "https://github.com/Berniebiloxi/mendophyte#readme",
+  "bugs": {
+    "url": "https://github.com/Berniebiloxi/mendophyte/issues"
+  }
+}
