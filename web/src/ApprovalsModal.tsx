@@ -7,7 +7,8 @@ import { store, useUi } from "./store.js";
  * interactive while one is pending, by design: this is not a toast.
  */
 export function ApprovalsModal() {
-  const { approvals, sessions } = useUi();
+  const approvals = useUi((st) => st.approvals);
+  const sessions = useUi((st) => st.sessions);
   const [reason, setReason] = useState("");
   const a = approvals[0];
   useEffect(() => setReason(""), [a?.id]);

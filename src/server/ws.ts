@@ -4,6 +4,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import type { ApprovalDecision } from "../orchestrator/index.js";
 import type { SessionManager } from "./session-manager.js";
 import type { TerminalManager } from "./terminals.js";
+import { NULL_LOG, brief, type DiagnosticLog } from "./diag.js";
 
 /**
  * Two websocket routes on one HTTP server:
@@ -27,7 +28,7 @@ import type { TerminalManager } from "./terminals.js";
  * bytes in both directions; text frames are JSON control messages
  * (`resize`, `input` inbound; `hello`, `exit` outbound).
  */
-export function attachWebSockets(server: HttpServer, manager: SessionManager, terminals: TerminalManager): { hub: WebSocketServer; term: WebSocketServer } {
+export function attachWebSockets(server: HttpServer, manager: SessionManager, terminals: TerminalManager, diag: DiagnosticLog = NULL_LOG): { hub: WebSocketServer; term: WebSocketServer } {
   const hub = new WebSocketServer({ noServer: true });
   const term = new WebSocketServer({ noServer: true });
 
@@ -63,6 +64,8 @@ export function attachWebSockets(server: HttpServer, manager: SessionManager, te
   terminals.on("closed", (t) => broadcast({ type: "terminal.closed", terminal: t }));
 
   hub.on("connection", (socket: WebSocket) => {
+    diag.log("ws", `client connected (${hub.clients.size} open)`);
+    socket.on("close", () => diag.log("ws", `client disconnected (${hub.clients.size} open)`));
     socket.send(JSON.stringify({ type: "snapshot", sessions: manager.list(), approvals: manager.pendingApprovals(), questions: manager.pendingQuestions(), terminals: terminals.list() }));
 
     socket.on("message", (raw) => {
@@ -70,8 +73,10 @@ export function attachWebSockets(server: HttpServer, manager: SessionManager, te
       try {
         msg = JSON.parse(String(raw));
       } catch {
+        diag.log("ws", "inbound: invalid JSON");
         return socket.send(JSON.stringify({ type: "error", message: "invalid JSON" }));
       }
+      diag.log("ws", `inbound ${msg?.type} ${brief(msg, 300)}`);
       try {
         switch (msg?.type) {
           case "approval.resolve": {

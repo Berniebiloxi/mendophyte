@@ -16,6 +16,7 @@ export const PANELS = [
   { id: "feedback", title: "Feedback log" },
   { id: "benchmark", title: "Benchmark" },
   { id: "diff", title: "Diff" },
+  { id: "debug", title: "Debug log" },
 ] as const;
 export type PanelId = (typeof PANELS)[number]["id"];
 

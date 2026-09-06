@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
-import { useActiveSession, useUi } from "../store.js";
+import { useActiveSession, useEventCount } from "../store.js";
 import type { DiffReport } from "../types.js";
 
 function cls(line: string): string {
@@ -20,10 +20,9 @@ function cls(line: string): string {
  */
 export function DiffPanel() {
   const s = useActiveSession();
-  const { events } = useUi();
   const [diff, setDiff] = useState<DiffReport | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const turns = s ? (events[s.id] ?? []).filter((e) => e.event === "turn" || e.event === "verification").length : 0;
+  const turns = useEventCount(s?.id, "turn", "verification");
 
   const load = () => {
     if (!s) return;

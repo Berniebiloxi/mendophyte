@@ -1,17 +1,16 @@
 import { useEffect, useState } from "react";
 import type { IDockviewPanelProps } from "dockview";
 import { api } from "../api.js";
-import { useActiveSession, useUi } from "../store.js";
+import { useActiveSession, useEventCount } from "../store.js";
 import type { FileContent } from "../types.js";
 
 /** Read-only view of one repository file, with line numbers. Refreshes after each turn. */
 export function FileViewerPanel(props: IDockviewPanelProps<{ path: string }>) {
   const s = useActiveSession();
-  const { events } = useUi();
   const p = props.params.path;
   const [file, setFile] = useState<FileContent | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const turns = s ? (events[s.id] ?? []).filter((e) => e.event === "turn").length : 0;
+  const turns = useEventCount(s?.id, "turn");
 
   useEffect(() => {
     if (!s) return;

@@ -5,7 +5,9 @@ import "@xterm/xterm/css/xterm.css";
 import "./theme.css";
 import { App } from "./App.js";
 import { store } from "./store.js";
+import { installDiagListeners } from "./diag.js";
 
+installDiagListeners();
 store.boot();
 
 createRoot(document.getElementById("root")!).render(

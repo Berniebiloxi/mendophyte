@@ -79,8 +79,9 @@ program
     }
 
     let url: string;
+    let logPath = "";
     try {
-      url = await startServer(port);
+      ({ url, logPath } = await startServer(port));
     } catch (e) {
       if ((e as NodeJS.ErrnoException)?.code !== "EADDRINUSE") {
         console.error(e instanceof Error ? e.message : String(e));
@@ -93,7 +94,7 @@ program
         console.log(`Port ${port} is held by a Mendophyte process that isn't responding (pid ${holder.pid}); stopping it…`);
         if (await killHolder(holder, port)) {
           try {
-            url = await startServer(port);
+            ({ url, logPath } = await startServer(port));
           } catch (e2) {
             console.error(e2 instanceof Error ? e2.message : String(e2));
             process.exitCode = 1;
@@ -120,6 +121,7 @@ program
       }
     }
     console.log(`mendophyte running at ${url}  (Ctrl-C to stop)`);
+    console.log(`debug log: ${logPath}`);
 
     if (opts.open) {
       await open(url);

@@ -3,7 +3,8 @@ import { api } from "../api.js";
 import { store, useUi } from "../store.js";
 
 export function SessionPanel() {
-  const { sessions, activeSessionId } = useUi();
+  const sessions = useUi((st) => st.sessions);
+  const activeSessionId = useUi((st) => st.activeSessionId);
   const [repoDir, setRepoDir] = useState("");
   const [repoUrl, setRepoUrl] = useState("");
   const [model, setModel] = useState("");

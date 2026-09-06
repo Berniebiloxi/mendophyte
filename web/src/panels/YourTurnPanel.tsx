@@ -90,7 +90,7 @@ function QuestionCard({ q }: { q: QuestionView }) {
  */
 export function YourTurnPanel() {
   const s = useActiveSession();
-  const { questions } = useUi();
+  const questions = useUi((st) => st.questions);
   const items = s?.lastState?.your_turn_items ?? [];
   const myQuestions = s ? questions.filter((q) => q.sessionId === s.id) : [];
   const [answers, setAnswers] = useState<Record<string, string>>({});

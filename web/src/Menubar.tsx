@@ -29,7 +29,12 @@ function Menu({ label, children }: { label: string; children: (close: () => void
 }
 
 export function Menubar({ api }: { api: DockviewApi | null }) {
-  const { connected, approvals, questions, theme, scheme, termFontSize } = useUi();
+  const connected = useUi((st) => st.connected);
+  const nApprovals = useUi((st) => st.approvals.length);
+  const nQuestions = useUi((st) => st.questions.length);
+  const theme = useUi((st) => st.theme);
+  const scheme = useUi((st) => st.scheme);
+  const termFontSize = useUi((st) => st.termFontSize);
   const active = useActiveSession();
   const [layouts, setLayouts] = useState<string[]>(() => Object.keys(namedLayouts()));
   const refreshLayouts = () => setLayouts(Object.keys(namedLayouts()));
@@ -105,6 +110,8 @@ export function Menubar({ api }: { api: DockviewApi | null }) {
       <Menu label="Help">
         {(close) => (
           <>
+            <button onClick={() => { api && showPanel(api, "debug"); close(); }}>Debug log <span className="kbd">for bug reports</span></button>
+            <hr />
             <button onClick={() => { window.open("https://github.com/anthropics/claude-agent-sdk-typescript", "_blank"); close(); }}>Agent SDK docs</button>
             <button onClick={() => { alert("Mendophyte 0.1.0\nLocal cockpit for AI-assisted open-source contribution work."); close(); }}>About</button>
           </>
@@ -112,8 +119,8 @@ export function Menubar({ api }: { api: DockviewApi | null }) {
       </Menu>
 
       <div className="menubar-status">
-        {approvals.length > 0 && <span className="attention">{approvals.length} awaiting your confirmation</span>}
-        {questions.length > 0 && <span className="attention" style={{ background: "var(--m-bloom)" }}>{questions.length} question{questions.length === 1 ? "" : "s"} for you</span>}
+        {nApprovals > 0 && <span className="attention">{nApprovals} awaiting your confirmation</span>}
+        {nQuestions > 0 && <span className="attention bloom">{nQuestions} question{nQuestions === 1 ? "" : "s"} for you</span>}
         {active && (
           <span title={active.repoDir}>
             {active.repoDir.split(/[\\/]/).pop()} · {active.status}

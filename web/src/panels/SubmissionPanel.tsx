@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
-import { store, useActiveSession, useUi } from "../store.js";
+import { store, useActiveSession, useLastEvent } from "../store.js";
 import type { CiStatus, SubmissionReport } from "../types.js";
 
 /**
@@ -14,14 +14,12 @@ const CI_GLYPH: Record<CiStatus, string> = { success: "✓", failure: "✗", pen
 
 export function SubmissionPanel() {
   const s = useActiveSession();
-  const { events } = useUi();
   const [report, setReport] = useState<SubmissionReport | null>(null);
   const [polling, setPolling] = useState<number | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
-  const list = s ? events[s.id] ?? [] : [];
-  const lastEvent = [...list].reverse().find((e) => e.event === "submission");
+  const lastEvent = useLastEvent(s?.id, "submission");
 
   useEffect(() => {
     setReport(null);

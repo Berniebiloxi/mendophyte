@@ -20,6 +20,7 @@ export interface CreateSessionBody {
 }
 
 export const api = {
+  diag: (tail = 300) => call<{ path: string; size: number; tail: string }>("GET", `/diag?tail=${tail}`),
   health: () => call<{ status: string; sessions: number; pendingApprovals: number }>("GET", "/health"),
   projects: () => call<{ projects: { name: string; artifactHome: string; modified: string }[] }>("GET", "/projects"),
   sessions: () => call<{ sessions: SessionSummary[] }>("GET", "/sessions"),

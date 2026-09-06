@@ -21,6 +21,7 @@ import { TriagePanel } from "./panels/TriagePanel.js";
 import { SubmissionPanel } from "./panels/SubmissionPanel.js";
 import { FeedbackPanel } from "./panels/FeedbackPanel.js";
 import { BenchmarkPanel } from "./panels/BenchmarkPanel.js";
+import { DebugPanel } from "./panels/DebugPanel.js";
 
 const components: Record<string, React.FunctionComponent<IDockviewPanelProps<any>>> = {
   terminal: TerminalPanel,
@@ -39,10 +40,11 @@ const components: Record<string, React.FunctionComponent<IDockviewPanelProps<any
   verification: VerificationPanel,
   diff: DiffPanel,
   transcript: TranscriptPanel,
+  debug: DebugPanel,
 };
 
 function useColorScheme(): "light" | "dark" {
-  const { scheme } = useUi();
+  const scheme = useUi((st) => st.scheme);
   const [sys, setSys] = useState<"light" | "dark">(() => (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
   useEffect(() => {
     const mq = matchMedia("(prefers-color-scheme: dark)");
@@ -57,10 +59,12 @@ export function App() {
   const [api, setApi] = useState<DockviewApi | null>(null);
   const saveTimer = useRef<number | null>(null);
   const colorScheme = useColorScheme();
-  const { toast, approvals, questions } = useUi();
+  const toast = useUi((st) => st.toast);
+  const nApprovals = useUi((st) => st.approvals.length);
+  const nQuestions = useUi((st) => st.questions.length);
 
   const theme: DockviewTheme = useMemo(
-    () => ({ name: "mendophyte", className: "dockview-theme-mendophyte", colorScheme, gap: 4, dndOverlayMounting: "absolute", dndPanelOverlay: "group" }),
+    () => ({ name: "mendophyte", className: "dockview-theme-mendophyte", colorScheme, gap: 8, dndOverlayMounting: "absolute", dndPanelOverlay: "group" }),
     [colorScheme]
   );
 
@@ -75,9 +79,9 @@ export function App() {
 
   useEffect(() => {
     const base = "Mendophyte";
-    const n = approvals.length + questions.length;
+    const n = nApprovals + nQuestions;
     document.title = n ? `(${n}) your turn · ${base}` : base;
-  }, [approvals.length, questions.length]);
+  }, [nApprovals, nQuestions]);
 
   return (
     <div className="app">

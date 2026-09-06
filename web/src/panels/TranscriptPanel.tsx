@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useActiveSession, useUi } from "../store.js";
+import { memo, useState } from "react";
+import { useActiveSession, useSessionEvents } from "../store.js";
 import type { AnyEvent } from "../types.js";
 
 function summary(e: AnyEvent): string {
@@ -29,9 +29,9 @@ function summary(e: AnyEvent): string {
 
 export function TranscriptPanel() {
   const s = useActiveSession();
-  const { events } = useUi();
+  const all = useSessionEvents(s?.id);
   const [raw, setRaw] = useState(false);
-  const list = (s ? events[s.id] ?? [] : []).filter((e) => raw || e.event !== "message");
+  const list = raw ? all : all.filter((e) => e.event !== "message");
   return (
     <div className="panel tr">
       <div className="row" style={{ marginBottom: 6 }}>

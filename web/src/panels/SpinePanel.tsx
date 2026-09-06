@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
-import { useActiveSession, useUi } from "../store.js";
+import { useActiveSession, useEventCount, useLastEvent, useUi } from "../store.js";
 import type { ArtifactEntry } from "../types.js";
 
 /**
@@ -38,13 +38,12 @@ function detectBuds(entries: ArtifactEntry[]): Set<string> {
 
 export function SpinePanel() {
   const s = useActiveSession();
-  const { verification, events } = useUi();
+  const verification = useUi((st) => st.verification);
   const [buds, setBuds] = useState<Set<string>>(new Set());
   const phase = s?.lastState?.phase ?? null;
   const complete = s?.lastState?.phase_complete ?? false;
-  const list = s ? events[s.id] ?? [] : [];
-  const turns = list.filter((e) => e.event === "turn").length;
-  const lastArtifacts = [...list].reverse().find((e) => e.event === "artifacts");
+  const turns = useEventCount(s?.id, "turn");
+  const lastArtifacts = useLastEvent(s?.id, "artifacts");
 
   useEffect(() => {
     if (!s) return setBuds(new Set());

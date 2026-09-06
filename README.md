@@ -97,6 +97,14 @@ MENDOPHYTE_FAKE_SESSION=1 npm start
 
 ## Troubleshooting
 
+**Start with the debug log.** Every server run writes one Markdown file
+under `~/.mendophyte/logs/` (the path is printed at startup and shown in
+**Help → Debug log**). It records every request, socket frame, session
+event, approval, question, button press, field change, store action and
+JS error, with anything that looks like a token redacted. To report a
+problem: press **Mark this moment** in the Debug log panel right after
+it happens, then send the file. `MENDOPHYTE_NO_DIAG=1` turns it off.
+
 - **`npm install` fails building node-pty (Linux):** install python3 and
   a C++ toolchain (`sudo apt install build-essential python3` on
   Debian/Ubuntu) and rerun. Everything except the Terminal panel works
@@ -188,6 +196,8 @@ DELETE /api/sessions/:id              force-close and forget
 GET    /api/approvals                 guardrail commands waiting on a human
 POST   /api/approvals/:id             { approved, reason? }
 GET    /api/questions                 AskUserQuestion calls waiting on a human
+GET    /api/diag                      debug log path, size and tail; /api/diag/download serves the file
+POST   /api/diag                      { entries: [{ at, source, text }] } from the browser
 POST   /api/questions/:id             { answers: { "<question>": "label" | ["a","b"] } } or { dismiss: true }
 ```
 

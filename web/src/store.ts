@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { api } from "./api.js";
+import { diag, diagError } from "./diag.js";
 import type { AnyEvent, ApprovalView, DetectionReport, QuestionAnswers, QuestionView, SchemeName, SessionEvent, SessionSummary, ThemeName, VerificationProgress, VerificationRun } from "./types.js";
 
 /**
@@ -16,6 +17,17 @@ export interface VerificationState {
   loaded: boolean;
 }
 
+/**
+ * Per-session index kept up to date as events arrive, so panels can ask
+ * "how many turns" or "the last artifacts event" through a selector that
+ * returns a stable value, instead of scanning the whole event list on
+ * every render.
+ */
+export interface EventMarks {
+  counts: Record<string, number>;
+  last: Record<string, AnyEvent>;
+}
+
 export interface UiState {
   connected: boolean;
   sessions: SessionSummary[];
@@ -24,6 +36,7 @@ export interface UiState {
   /** AskUserQuestion calls waiting for answers. */
   questions: QuestionView[];
   events: Record<string, AnyEvent[]>;
+  marks: Record<string, EventMarks>;
   verification: Record<string, VerificationState>;
   theme: ThemeName;
   scheme: SchemeName;
@@ -49,6 +62,7 @@ class Store {
       approvals: [],
       questions: [],
       events: {},
+      marks: {},
       verification: {},
       theme: (safeGet(LS.theme) as ThemeName) || "vine",
       scheme: (safeGet(LS.scheme) as SchemeName) || "auto",
@@ -59,6 +73,7 @@ class Store {
 
   setTermFontSize(px: number) {
     const v = Math.max(9, Math.min(28, Math.round(px)));
+    diag(`terminal font ${v}px`);
     safeSet(LS.termFont, String(v));
     this.set({ termFontSize: v });
   }
@@ -82,11 +97,13 @@ class Store {
   }
 
   setTheme(theme: ThemeName) {
+    diag(`theme ${theme}`);
     safeSet(LS.theme, theme);
     this.set({ theme });
     this.applyTheme();
   }
   setScheme(scheme: SchemeName) {
+    diag(`scheme ${scheme}`);
     safeSet(LS.scheme, scheme);
     this.set({ scheme });
     this.applyTheme();
@@ -97,12 +114,14 @@ class Store {
   }
 
   toast(msg: string) {
+    diag(`toast "${msg}"`);
     this.set({ toast: msg });
     setTimeout(() => this.state.toast === msg && this.set({ toast: null }), 4000);
   }
 
   // ---- sessions
   setActive(id: string | null) {
+    if (id !== this.state.activeSessionId) diag(`active session → ${id ?? "none"}`);
     safeSet(LS.active, id ?? "");
     this.set({ activeSessionId: id });
     if (id) this.ensureReplayed(id);
@@ -112,6 +131,7 @@ class Store {
   }
 
   async createSession(body: Parameters<typeof api.createSession>[0]) {
+    diag(`createSession repo=${body.repoDir} model=${body.model ?? "default"} preflight=${body.preflight ?? true}`);
     const { session } = await api.createSession(body);
     this.upsertSession(session);
     this.setActive(session.id);
@@ -121,6 +141,7 @@ class Store {
   async send(text: string) {
     const id = this.state.activeSessionId;
     if (!id) throw new Error("no active session");
+    diag(`send to ${id}: "${text.slice(0, 200).replace(/\s+/g, " ")}"${text.length > 200 ? ` (+${text.length - 200} chars)` : ""}`);
     await api.send(id, text);
     this.appendEvent({ seq: -Date.now(), at: new Date().toISOString(), sessionId: id, event: "user_text", data: { text } });
   }
@@ -138,10 +159,13 @@ class Store {
   private appendEvent(e: AnyEvent) {
     this.set((st) => {
       const cur = st.events[e.sessionId] ?? [];
-      if (e.seq > 0 && cur.some((x) => x.seq === e.seq)) return {};
+      // Duplicates only ever arrive at the tail (a replay overlapping the live stream).
+      if (e.seq > 0) for (let i = cur.length - 1; i >= 0 && i >= cur.length - 50; i--) if (cur[i].seq === e.seq) return {};
       const next = [...cur, e];
       if (next.length > EVENT_CAP) next.splice(0, next.length - EVENT_CAP);
-      return { events: { ...st.events, [e.sessionId]: next } };
+      const m = st.marks[e.sessionId] ?? { counts: {}, last: {} };
+      const marks: EventMarks = { counts: { ...m.counts, [e.event]: (m.counts[e.event] ?? 0) + 1 }, last: { ...m.last, [e.event]: e } };
+      return { events: { ...st.events, [e.sessionId]: next }, marks: { ...st.marks, [e.sessionId]: marks } };
     });
     if (e.event === "verification" || e.event === "verification_detected" || e.event === "verification_progress") this.applyVerificationEvent(e as SessionEvent);
   }
@@ -190,11 +214,13 @@ class Store {
   }
 
   answerQuestion(id: string, answers: QuestionAnswers) {
+    diag(`answerQuestion ${id} ${JSON.stringify(answers).slice(0, 300)}`);
     this.wsSend({ type: "question.answer", id, answers });
     this.set((st) => ({ questions: st.questions.filter((q) => q.id !== id) }));
   }
 
   resolveApproval(id: string, approved: boolean, reason?: string) {
+    diag(`resolveApproval ${id} ${approved ? "APPROVED" : "denied"}${reason ? ` reason="${reason.slice(0, 200)}"` : ""}`);
     this.wsSend({ type: "approval.resolve", id, approved, reason });
     // optimistic removal; the server's approval.resolved frame confirms it
     this.set((st) => ({ approvals: st.approvals.filter((a) => a.id !== id) }));
@@ -205,13 +231,15 @@ class Store {
     const ws = new WebSocket(url);
     this.ws = ws;
     ws.onopen = () => {
+      diag(`ws open (retry ${this.retry})`);
       this.retry = 0;
       this.replayed.clear();
       this.set({ connected: true });
     };
-    ws.onclose = () => {
+    ws.onclose = (ev) => {
       this.set({ connected: false });
       const delay = Math.min(10_000, 500 * 2 ** this.retry++);
+      diag(`ws closed code=${ev.code} reason="${ev.reason}" → reconnect in ${delay}ms`);
       setTimeout(() => this.connect(), delay);
     };
     ws.onerror = () => ws.close();
@@ -225,6 +253,7 @@ class Store {
       switch (m.type) {
         case "snapshot": {
           const sessions: SessionSummary[] = m.sessions ?? [];
+          diag(`snapshot: ${sessions.length} session(s), ${(m.approvals ?? []).length} approval(s), ${(m.questions ?? []).length} question(s)`);
           let active = this.state.activeSessionId;
           if (!active || !sessions.some((s) => s.id === active)) active = sessions.find((s) => s.status === "running")?.id ?? sessions[0]?.id ?? null;
           this.set({ sessions, approvals: m.approvals ?? [], questions: m.questions ?? [], activeSessionId: active });
@@ -248,18 +277,21 @@ class Store {
           return;
         }
         case "approval.pending":
+          diag(`approval.pending ${m.approval.id} [${m.approval.match?.ruleId}] shown`);
           this.set((st) => (st.approvals.some((a) => a.id === m.approval.id) ? {} : { approvals: [...st.approvals, m.approval] }));
           return;
         case "approval.resolved":
           this.set((st) => ({ approvals: st.approvals.filter((a) => a.id !== m.approval.id) }));
           return;
         case "question.pending":
+          diag(`question.pending ${m.question.id} shown (${(m.question.questions ?? []).length} question(s))`);
           this.set((st) => (st.questions.some((q) => q.id === m.question.id) ? {} : { questions: [...st.questions, m.question] }));
           return;
         case "question.resolved":
           this.set((st) => ({ questions: st.questions.filter((q) => q.id !== m.question.id) }));
           return;
         case "error":
+          diagError(`ws error frame: ${m.message}${m.inReplyTo ? ` (in reply to ${m.inReplyTo})` : ""}`);
           this.toast(m.message);
           return;
       }
@@ -283,10 +315,41 @@ function safeSet(k: string, v: string) {
 }
 
 export const store = new Store();
-export function useUi(): UiState {
-  return useSyncExternalStore(store.subscribe, store.get, store.get);
+
+const EMPTY_EVENTS: AnyEvent[] = [];
+const EMPTY_MARKS: EventMarks = { counts: {}, last: {} };
+
+/**
+ * Subscribe to the store. With a selector, the component re-renders only
+ * when the selected value changes (by identity), so pass selectors that
+ * return primitives or slices the store replaces only when they change.
+ * Without one, every store update re-renders the caller; keep that for
+ * components that really do need the whole state.
+ */
+export function useUi(): UiState;
+export function useUi<T>(selector: (s: UiState) => T): T;
+export function useUi<T>(selector?: (s: UiState) => T): T | UiState {
+  const get = (selector ? () => selector(store.state) : store.get) as () => T | UiState;
+  return useSyncExternalStore(store.subscribe, get, get);
 }
 export function useActiveSession(): SessionSummary | null {
-  const s = useUi();
-  return s.sessions.find((x) => x.id === s.activeSessionId) ?? null;
+  return useUi((s) => s.sessions.find((x) => x.id === s.activeSessionId) ?? null);
+}
+/** The active session's events; a stable empty array when there is none. */
+export function useSessionEvents(id: string | null | undefined): AnyEvent[] {
+  return useUi((s) => (id ? s.events[id] : undefined) ?? EMPTY_EVENTS);
+}
+/** The most recent event of one kind for a session, without scanning the list. */
+export function useLastEvent(id: string | null | undefined, event: string): AnyEvent | undefined {
+  return useUi((s) => (id ? s.marks[id] ?? EMPTY_MARKS : EMPTY_MARKS).last[event]);
+}
+/** How many events of the given kinds a session has had; a number, so cheap to compare. */
+export function useEventCount(id: string | null | undefined, ...events: string[]): number {
+  return useUi((s) => {
+    const m = id ? s.marks[id] : undefined;
+    if (!m) return 0;
+    let n = 0;
+    for (const e of events) n += m.counts[e] ?? 0;
+    return n;
+  });
 }

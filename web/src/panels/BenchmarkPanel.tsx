@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api.js";
-import { store, useActiveSession, useUi } from "../store.js";
+import { store, useActiveSession, useLastEvent } from "../store.js";
 import type { BenchComparison, BenchDetection, BenchRun, BenchSample } from "../types.js";
 
 /**
@@ -79,7 +79,6 @@ function Row({ row, max }: { row: BenchComparison["rows"][number]; max: number }
 
 export function BenchmarkPanel() {
   const s = useActiveSession();
-  const { events } = useUi();
   const [detection, setDetection] = useState<BenchDetection | null>(null);
   const [runs, setRuns] = useState<BenchRun[]>([]);
   const [baseline, setBaseline] = useState<string>("");
@@ -90,8 +89,7 @@ export function BenchmarkPanel() {
   const [busy, setBusy] = useState(false);
   const [view, setView] = useState<"chart" | "table">("chart");
 
-  const list = s ? events[s.id] ?? [] : [];
-  const lastBench = [...list].reverse().find((e) => e.event === "benchmark");
+  const lastBench = useLastEvent(s?.id, "benchmark");
 
   const load = () => {
     if (!s) return;

@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { api } from "../api.js";
-import { store, useActiveSession, useUi } from "../store.js";
+import { store, useActiveSession, useSessionEvents } from "../store.js";
 import type { AnyEvent } from "../types.js";
 
 function toolLine(data: any): string {
@@ -15,7 +15,7 @@ function toolLine(data: any): string {
   return `${name} ${JSON.stringify(data?.input ?? {}).slice(0, 120)}`;
 }
 
-function Entry({ e }: { e: AnyEvent }) {
+const Entry = memo(function Entry({ e }: { e: AnyEvent }) {
   switch (e.event) {
     case "assistant_text":
       return <div className="msg assistant">{(e.data as any).text}</div>;
@@ -42,12 +42,11 @@ function Entry({ e }: { e: AnyEvent }) {
     default:
       return null;
   }
-}
+});
 
 export function ConversationPanel() {
   const s = useActiveSession();
-  const { events } = useUi();
-  const list = s ? events[s.id] ?? [] : [];
+  const list = useSessionEvents(s?.id);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);

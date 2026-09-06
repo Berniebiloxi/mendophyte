@@ -33,7 +33,9 @@ function xtermTheme(dark: boolean): ITheme {
 
 export function TerminalPanel(props: IDockviewPanelProps<{ termId?: string }>) {
   const s = useActiveSession();
-  const { theme, scheme, termFontSize } = useUi();
+  const theme = useUi((st) => st.theme);
+  const scheme = useUi((st) => st.scheme);
+  const termFontSize = useUi((st) => st.termFontSize);
   const host = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);

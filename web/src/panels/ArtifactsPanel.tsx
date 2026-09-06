@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api.js";
 import { renderMarkdown } from "../markdown.js";
-import { store, useActiveSession, useUi } from "../store.js";
+import { store, useActiveSession, useLastEvent } from "../store.js";
 import type { ArtifactEntry, FileContent } from "../types.js";
 
 const LETTERS: Record<string, string> = { A: "Recon Notes", B: "Triage Record", C: "The Fix", D: "Glossary", E: "Submission", F: "Feedback Log" };
@@ -25,7 +25,6 @@ function letterOf(name: string): string | null {
  */
 export function ArtifactsPanel() {
   const s = useActiveSession();
-  const { events } = useUi();
   const [entries, setEntries] = useState<ArtifactEntry[]>([]);
   const [home, setHome] = useState<string>("");
   const [selected, setSelected] = useState<string | null>(null);
@@ -33,8 +32,7 @@ export function ArtifactsPanel() {
   const [find, setFind] = useState("");
 
   // The watcher's `artifacts` events carry the fresh listing.
-  const list = s ? events[s.id] ?? [] : [];
-  const lastArtifactsEvent = [...list].reverse().find((e) => e.event === "artifacts");
+  const lastArtifactsEvent = useLastEvent(s?.id, "artifacts");
 
   useEffect(() => {
     if (!s) return;

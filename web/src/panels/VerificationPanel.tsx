@@ -25,7 +25,7 @@ function Result({ r }: { r: CheckResult }) {
  */
 export function VerificationPanel() {
   const s = useActiveSession();
-  const { verification } = useUi();
+  const verification = useUi((st) => st.verification);
   const v = s ? verification[s.id] : undefined;
   const [busy, setBusy] = useState<"detect" | "run" | null>(null);
   const [custom, setCustom] = useState("");

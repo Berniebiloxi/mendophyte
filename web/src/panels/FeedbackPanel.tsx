@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api.js";
-import { store, useActiveSession, useUi } from "../store.js";
+import { store, useActiveSession, useLastEvent } from "../store.js";
 import type { FeedbackEntry, FeedbackLog } from "../types.js";
 
 /**
@@ -10,7 +10,6 @@ import type { FeedbackEntry, FeedbackLog } from "../types.js";
  */
 export function FeedbackPanel() {
   const s = useActiveSession();
-  const { events } = useUi();
   const [log, setLog] = useState<FeedbackLog | null>(null);
   const [q, setQ] = useState("");
   const [tag, setTag] = useState<string | null>(null);
@@ -19,9 +18,8 @@ export function FeedbackPanel() {
   const [source, setSource] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const list = s ? events[s.id] ?? [] : [];
-  const lastLogEvent = [...list].reverse().find((e) => e.event === "feedback_log");
-  const lastArtifacts = [...list].reverse().find((e) => e.event === "artifacts");
+  const lastLogEvent = useLastEvent(s?.id, "feedback_log");
+  const lastArtifacts = useLastEvent(s?.id, "artifacts");
 
   const load = () => {
     if (!s) return;
