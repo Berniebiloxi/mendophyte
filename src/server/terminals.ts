@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import { childEnv } from "../orchestrator/env.js";
 import { randomUUID } from "node:crypto";
 import { chmodSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -84,8 +85,9 @@ export function defaultShell(): { file: string; args: string[] } {
     return { file: process.env.COMSPEC && /powershell|pwsh/i.test(process.env.SHELL ?? "") ? process.env.SHELL! : "powershell.exe", args: ["-NoLogo"] };
   }
   const sh = process.env.SHELL || "/bin/bash";
-  // login shell so the user's PATH and prompt match their normal terminal
-  return { file: sh, args: ["-l"] };
+  // login + interactive so the user's PATH, prompt and rc files match their normal
+  // terminal (zsh only reads .zshrc when interactive; bash only .bash_profile when login)
+  return { file: sh, args: ["-l", "-i"] };
 }
 
 export class TerminalManager extends EventEmitter {
@@ -109,14 +111,10 @@ export class TerminalManager extends EventEmitter {
     const { file, args } = defaultShell();
     const cols = opts.cols ?? 100;
     const rows = opts.rows ?? 30;
-    const env: Record<string, string> = {};
-    for (const [k, v] of Object.entries({ ...process.env, ...(opts.env ?? {}) })) if (v !== undefined) env[k] = v;
+    const env = childEnv(opts.env ?? {});
     env.TERM = "xterm-256color";
     env.COLORTERM = "truecolor";
     env.MENDOPHYTE = "1";
-    // A shell started from inside a Claude Code session inherits its guard;
-    // this is the user's own shell, so drop the marker.
-    delete env.CLAUDECODE;
 
     let proc: IPty;
     try {
@@ -209,6 +207,7 @@ export class TerminalManager extends EventEmitter {
       }
     });
     ws.on("close", () => term.clients.delete(ws));
+    ws.on("error", () => term.clients.delete(ws));
   }
 
   kill(id: string): boolean {

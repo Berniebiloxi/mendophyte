@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import { childEnv } from "./env.js";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -79,6 +80,8 @@ export interface SessionEvents {
   message: (m: SDKMessage) => void;
   init: (info: { sessionId: string; model: string; permissionMode: string; tools: string[] }) => void;
   assistant_text: (text: string) => void;
+  /** A streamed slice of the assistant's text as it is being written; the full text follows as assistant_text. */
+  assistant_delta: (text: string) => void;
   tool_use: (info: { name: string; input: unknown; id: string }) => void;
   /** A tool call that canUseTool allowed without a human (not on the guardrail list). */
   tool_allowed: (info: { toolName: string; input: Record<string, unknown> }) => void;
@@ -198,11 +201,8 @@ export class MendophyteSession extends EventEmitter {
 
     const rules = c.guardrails ?? DEFAULT_GUARDRAIL_RULES;
 
-    const env: NodeJS.ProcessEnv = { ...process.env, ...(c.env ?? {}) };
-    if (c.stripNestedSessionEnv !== false) {
-      delete env.CLAUDECODE;
-      delete env.CLAUDE_CODE_CHILD_SESSION;
-    }
+    // childEnv strips the nesting guard and npm's lifecycle variables; see env.ts.
+    const env: NodeJS.ProcessEnv = childEnv(c.env ?? {});
     env.CLAUDE_AGENT_SDK_CLIENT_APP ??= "mendophyte/0.1.0";
 
     // Hard floor. Runs before deny/ask rules, permission mode and allow
@@ -279,6 +279,9 @@ export class MendophyteSession extends EventEmitter {
       cwd: c.repoDir,
       additionalDirectories: [c.artifactHome, c.promptDir],
       systemPrompt: { type: "preset", preset: "claude_code", append },
+      // Token-level streaming so the UI can show text as it is written instead of
+      // waiting for each whole message; the dashboard state still arrives per turn.
+      includePartialMessages: true,
       allowedTools: ["Read", "Grep", "Glob", ...(useTools ? MENDOPHYTE_TOOL_ALLOWLIST : [])],
       mcpServers,
       permissionMode: c.permissionMode ?? "default",
@@ -323,6 +326,13 @@ export class MendophyteSession extends EventEmitter {
   }
 
   private dispatch(m: SDKMessage): void {
+    if (m.type === "stream_event") {
+      // Top-level text only; subagent streams (parent_tool_use_id set) are not the reply.
+      if (m.parent_tool_use_id) return;
+      const ev = m.event as { type: string; delta?: { type: string; text?: string } };
+      if (ev.type === "content_block_delta" && ev.delta?.type === "text_delta" && ev.delta.text) this.emit("assistant_delta", ev.delta.text);
+      return; // never recorded as a raw message: one per token would swamp the buffer
+    }
     this.emit("message", m);
 
     if (m.type === "system" && m.subtype === "init") {

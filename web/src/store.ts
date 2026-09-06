@@ -37,6 +37,8 @@ export interface UiState {
   questions: QuestionView[];
   events: Record<string, AnyEvent[]>;
   marks: Record<string, EventMarks>;
+  /** The assistant's reply in progress, per session, streamed token by token. */
+  drafts: Record<string, string>;
   verification: Record<string, VerificationState>;
   theme: ThemeName;
   scheme: SchemeName;
@@ -84,6 +86,7 @@ class Store {
       questions: [],
       events: {},
       marks: {},
+      drafts: {},
       verification: {},
       theme: (safeGet(LS.theme) as ThemeName) || "vine",
       scheme: (safeGet(LS.scheme) as SchemeName) || "auto",
@@ -182,7 +185,7 @@ class Store {
     if (!id) throw new Error("no active session");
     diag(`send to ${id}: "${text.slice(0, 200).replace(/\s+/g, " ")}"${text.length > 200 ? ` (+${text.length - 200} chars)` : ""}`);
     await api.send(id, text);
-    this.appendEvent({ seq: -Date.now(), at: new Date().toISOString(), sessionId: id, event: "user_text", data: { text } });
+    // the server records the message as a user_text event and streams it back, so replays keep it
   }
 
   private upsertSession(s: SessionSummary) {
@@ -328,6 +331,13 @@ class Store {
           return;
         case "question.resolved":
           this.set((st) => ({ questions: st.questions.filter((q) => q.id !== m.question.id) }));
+          return;
+        case "session.draft":
+          this.set((st) => {
+            const text = String(m.text ?? "");
+            if ((st.drafts[m.sessionId] ?? "") === text) return {};
+            return { drafts: { ...st.drafts, [m.sessionId]: text } };
+          });
           return;
         case "error":
           diagError(`ws error frame: ${m.message}${m.inReplyTo ? ` (in reply to ${m.inReplyTo})` : ""}`);

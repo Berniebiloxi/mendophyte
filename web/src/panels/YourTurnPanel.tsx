@@ -49,36 +49,36 @@ function QuestionCard({ q }: { q: QuestionView }) {
 
   return (
     <div className="yt-item yt-question">
-      <div className="row">
-        <span className="tag bloom">the agent asks</span>
-        <span className="faint">{q.questions.length} question{q.questions.length === 1 ? "" : "s"} · answer all, then send</span>
+      <div className="qc-head">
+        <span className="qc-badge"><span className="leaves sm"><i /><i /><i /></span> the agent asks</span>
+        <span className="faint">{q.questions.length === 1 ? "one question" : `${q.questions.length} questions`} · the agent waits for this</span>
       </div>
-      {q.questions.map((x) => (
-        <div key={x.question} style={{ margin: "8px 0" }}>
-          <div className="row" style={{ gap: 6 }}>
-            <span className="tag">{x.header}</span>
+      {q.questions.map((x, qi) => (
+        <div key={x.question} className="qc-q">
+          <div className="qc-title">
+            {q.questions.length > 1 && <span className="qc-n">{qi + 1}</span>}
+            <span className="tag accent">{x.header}</span>
             <b>{x.question}</b>
           </div>
-          <div className="stack" style={{ gap: 4, marginTop: 6 }}>
+          <div className="qc-options" role={x.multiSelect ? "group" : "radiogroup"}>
             {x.options.map((o) => {
               const on = (picked[x.question] ?? []).includes(o.label);
               return (
-                <label key={o.label} className={`yt-option${on ? " on" : ""}`}>
+                <label key={o.label} className={`qc-opt${on ? " on" : ""}`}>
                   <input type={x.multiSelect ? "checkbox" : "radio"} name={q.id + x.question} checked={on} onChange={() => toggle(x.question, o.label, x.multiSelect)} />
-                  <span>
+                  <span className="qc-mark" aria-hidden="true">{on ? "✓" : ""}</span>
+                  <span className="qc-text">
                     <b>{o.label}</b>
-                    {o.description && <span className="muted"> — {o.description}</span>}
+                    {o.description && <span className="muted">{o.description}</span>}
                   </span>
                 </label>
               );
             })}
-            <input type="text" value={other[x.question] ?? ""} onChange={(e) => setOther((s) => ({ ...s, [x.question]: e.target.value }))} placeholder="or type your own answer" />
           </div>
+          <input className="qc-other" type="text" value={other[x.question] ?? ""} onChange={(e) => setOther((s) => ({ ...s, [x.question]: e.target.value }))} placeholder={x.multiSelect ? "add your own answer (optional)" : "or type your own answer"} />
         </div>
       ))}
-      <div className="row" style={{ justifyContent: "flex-end" }}>
-        <button className="btn primary sm" disabled={busy || !answered} onClick={submit}>Send answers</button>
-      </div>
+      <button className="btn primary qc-send" disabled={busy || !answered} onClick={submit}>{busy ? "Sending…" : answered ? "Send answers" : "Choose an answer for each question"}</button>
     </div>
   );
 }

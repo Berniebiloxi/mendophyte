@@ -200,11 +200,27 @@ test("server bridge: REST + websocket round trip with a fake session", async () 
     const err = await next((m) => m.type === "error");
     assert.match(err.message, /no pending approval/);
 
-    // Turn completes with state: summary reflects it, event carries it.
+    // The kickoff was a send: the session is busy, and the message is an event so replays keep it.
+    assert.equal((await api("GET", `/sessions/${id}`)).json.session.busy, true);
+    assert.ok((await api("GET", `/sessions/${id}/events?after=0`)).json.events.some((e: any) => e.event === "user_text" && e.data.kickoff === true && e.data.text === "hello agent"));
+
+    // Streamed text arrives as a draft frame (not buffered), then the full text as an event.
+    fakes[0].emit("assistant_delta", "Read");
+    fakes[0].emit("assistant_delta", "ing…");
+    const draft = await next((m) => m.type === "session.draft" && m.sessionId === id && m.text.length > 0);
+    assert.equal(draft.text, "Reading…");
+    fakes[0].emit("assistant_text", "Reading the repo.");
+    const cleared = await next((m) => m.type === "session.draft" && m.sessionId === id && m.text === "");
+    assert.equal(cleared.text, "");
+
+    // Turn completes with state: summary reflects it, event carries it, busy clears, timing is measured.
     const state = { phase: 0, phase_complete: false, your_turn_items: [{ id: "q1", kind: "answer_question", prompt: "Experience?", blocks: "none" }] };
     fakes[0].finishTurn(state);
     const turn = await next((m) => m.type === "session.event" && m.event === "turn" && m.sessionId === id);
     assert.equal(turn.data.state.phase, 0);
+    assert.ok(turn.data.timing && turn.data.timing.wallMs >= 0 && turn.data.timing.firstTextMs >= 0, "turn carries timing");
+    assert.equal((await api("GET", `/sessions/${id}`)).json.session.busy, false);
+    assert.equal((await api("GET", `/sessions/${id}`)).json.session.lastTurn.wallMs, turn.data.timing.wallMs);
     const s2 = await api("GET", `/sessions/${id}`);
     assert.equal(s2.json.session.lastState.your_turn_items[0].id, "q1");
 

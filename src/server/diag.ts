@@ -67,15 +67,22 @@ export class DiagnosticLog {
   readonly path: string;
   private bytes = 0;
   private rotated = 0;
-  private readonly enabled: boolean;
+  private enabled: boolean;
+  private headerWritten = false;
+  private readonly dir: string;
 
   constructor(opts: { dir?: string; name?: string; enabled?: boolean } = {}) {
     this.enabled = opts.enabled ?? true;
-    const dir = opts.dir ?? defaultLogDir();
-    this.path = path.join(dir, `${opts.name ?? `mendophyte-${stamp()}`}.md`);
-    if (!this.enabled) return;
+    this.dir = opts.dir ?? defaultLogDir();
+    this.path = path.join(this.dir, `${opts.name ?? `mendophyte-${stamp()}`}.md`);
+    if (this.enabled) this.writeHeader();
+  }
+
+  private writeHeader(): void {
+    if (this.headerWritten) return;
+    this.headerWritten = true;
     try {
-      mkdirSync(dir, { recursive: true });
+      mkdirSync(this.dir, { recursive: true });
       this.raw(
         [
           `# Mendophyte debug log`,
@@ -92,6 +99,21 @@ export class DiagnosticLog {
       );
     } catch {
       /* logging must never take the server down */
+    }
+  }
+
+  get isEnabled(): boolean {
+    return this.enabled;
+  }
+
+  /** Pause or resume collection. The header is written once; a pause/resume leaves a marker. */
+  setEnabled(on: boolean): void {
+    if (on === this.enabled) return;
+    if (!on) this.log("server", "log collection paused by the user");
+    this.enabled = on;
+    if (on) {
+      this.writeHeader();
+      this.log("server", "log collection resumed by the user");
     }
   }
 

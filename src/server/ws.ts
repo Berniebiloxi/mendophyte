@@ -59,6 +59,7 @@ export function attachWebSockets(server: HttpServer, manager: SessionManager, te
   manager.on("approval.resolved", (approval, decision) => broadcast({ type: "approval.resolved", approval, decision }));
   manager.on("question.pending", (question) => broadcast({ type: "question.pending", question }));
   manager.on("question.resolved", (question, answered) => broadcast({ type: "question.resolved", question, answered }));
+  manager.on("session.draft", (sessionId, text) => broadcast({ type: "session.draft", sessionId, text }));
   terminals.on("created", (t) => broadcast({ type: "terminal.created", terminal: t }));
   terminals.on("exit", (t) => broadcast({ type: "terminal.exit", terminal: t }));
   terminals.on("closed", (t) => broadcast({ type: "terminal.closed", terminal: t }));
@@ -66,6 +67,7 @@ export function attachWebSockets(server: HttpServer, manager: SessionManager, te
   hub.on("connection", (socket: WebSocket) => {
     diag.log("ws", `client connected (${hub.clients.size} open)`);
     socket.on("close", () => diag.log("ws", `client disconnected (${hub.clients.size} open)`));
+    socket.on("error", (e) => diag.log("ws", `client socket error: ${e.message}`));
     socket.send(JSON.stringify({ type: "snapshot", sessions: manager.list(), approvals: manager.pendingApprovals(), questions: manager.pendingQuestions(), terminals: terminals.list() }));
 
     socket.on("message", (raw) => {

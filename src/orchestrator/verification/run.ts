@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { childEnv } from "../env.js";
 import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -106,7 +107,7 @@ async function runOne(check: VerificationCheck, opts: RunOptions, runId: string,
       child = spawn(check.command, {
         cwd: cwd.abs,
         shell: true,
-        env: { ...process.env, CI: process.env.CI ?? "1", FORCE_COLOR: "0", NO_COLOR: "1", ...(opts.env ?? {}) },
+        env: childEnv({ CI: process.env.CI ?? "1", FORCE_COLOR: "0", NO_COLOR: "1", ...(opts.env ?? {}) }),
         stdio: ["ignore", "pipe", "pipe"],
         windowsHide: true,
         // Own process group on POSIX so a timeout can kill the shell AND

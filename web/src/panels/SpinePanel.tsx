@@ -75,6 +75,13 @@ export function SpinePanel() {
   }
   const total = 1000;
   const grownFrac = phase === null ? 0 : Math.min(1, (phase + (complete ? 1 : 0.45)) / 5);
+  // The segment being travelled right now: from the last finished node to the current one.
+  const seg = (i: number) => {
+    const cx = (x(i - 1) + x(i)) / 2 + (i % 2 === 0 ? -26 : 26);
+    const cy = (y(i - 1) + y(i)) / 2;
+    return `M ${x(i - 1)} ${y(i - 1)} Q ${cx} ${cy} ${x(i)} ${y(i)}`;
+  };
+  const flowing = phase !== null && !complete && phase > 0 ? phase : complete && phase !== null && phase < 5 ? phase + 1 : null;
 
   return (
     <div className="panel spine">
@@ -83,13 +90,21 @@ export function SpinePanel() {
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={s ? `Phase ${phase ?? "not started"}` : "no session"}>
         <path className="vine-path" d={d} />
         <path className="vine-grown" d={d} pathLength={total} strokeDasharray={`${grownFrac * total} ${total}`} />
+        {flowing !== null && s?.status === "running" && (
+          <>
+            <path className="vine-flow-glow" d={seg(flowing)} pathLength={100} />
+            <path className="vine-flow" d={seg(flowing)} pathLength={100} />
+          </>
+        )}
         {PHASES.map((p, i) => {
           const done = phase !== null && (p.n < phase || (p.n === phase && complete));
           const now = phase === p.n && !complete;
           const cls = done ? "node done" : now ? "node now" : "node";
           return (
             <g key={p.n}>
+              {now && <circle className="glow" cx={x(i)} cy={y(i)} r={11} />}
               {now && <circle className="pulse" cx={x(i)} cy={y(i)} r={9} />}
+              {now && <circle className="pulse two" cx={x(i)} cy={y(i)} r={9} />}
               {/* a leaf on each grown node */}
               <path className={`leaf${done || now ? "" : " dormant"}`} d={`M ${x(i) - 6} ${y(i) - 10} q -14 -14 -4 -26 q 12 6 4 26 z`} />
               <circle className={cls} cx={x(i)} cy={y(i)} r={7} />

@@ -71,8 +71,23 @@ export interface SessionSummary {
   pendingApprovals: number;
   /** AskUserQuestion calls waiting for the user in the UI. */
   pendingQuestions: number;
+  /** True from a message being sent until the turn's result arrives: the agent is working. */
+  busy: boolean;
+  /** Wall-clock and API time of the last completed turn, for the latency readout. */
+  lastTurn: TurnTiming | null;
   lastError: string | null;
   preflight: PreflightSummary | null;
+}
+
+export interface TurnTiming {
+  /** From the user's message (or kickoff) to the turn's result. */
+  wallMs: number;
+  /** Time the model API itself took, as reported by Claude Code. */
+  apiMs: number | null;
+  /** From the message to the first streamed text. */
+  firstTextMs: number | null;
+  numTurns: number | null;
+  costUsd: number | null;
 }
 
 export interface PreflightSummary {
@@ -86,6 +101,7 @@ export interface PreflightSummary {
 export type SessionEventName =
   | "init"
   | "assistant_text"
+  | "user_text"
   | "tool_use"
   | "tool_allowed"
   | "turn"
@@ -144,6 +160,8 @@ export interface ManagerEvents {
   "approval.resolved": (a: ApprovalView, decision: ApprovalDecision) => void;
   "question.pending": (q: QuestionView) => void;
   "question.resolved": (q: QuestionView, answered: boolean) => void;
+  /** The assistant's reply so far, streamed; not buffered, "" when the reply is complete. */
+  "session.draft": (sessionId: string, text: string) => void;
 }
 
 interface Entry {
@@ -166,6 +184,10 @@ interface Entry {
   submissionTimer: NodeJS.Timeout | null;
   submissionIntervalSec: number | null;
   submissionBusy: boolean;
+  turnStartedAt: number | null;
+  firstTextAt: number | null;
+  draft: string;
+  draftTimer: NodeJS.Timeout | null;
 }
 
 export const VERIFICATION_HISTORY = 20;
@@ -367,6 +389,8 @@ export class SessionManager extends EventEmitter {
       lastTriage: null,
       pendingApprovals: 0,
       pendingQuestions: 0,
+      busy: false,
+      lastTurn: null,
       lastError: null,
       preflight: report
         ? {
@@ -378,7 +402,7 @@ export class SessionManager extends EventEmitter {
           }
         : null,
     };
-    const entry: Entry = { summary, session, broker, questions, events: [], seq: 0, preflightFacts: facts, report, fragility: null, verificationDetected: null, verificationRuns: [], watcher: null, watchTimer: null, submission: null, submissionTimer: null, submissionIntervalSec: null, submissionBusy: false };
+    const entry: Entry = { summary, session, broker, questions, turnStartedAt: null, firstTextAt: null, draft: "", draftTimer: null, events: [], seq: 0, preflightFacts: facts, report, fragility: null, verificationDetected: null, verificationRuns: [], watcher: null, watchTimer: null, submission: null, submissionTimer: null, submissionIntervalSec: null, submissionBusy: false };
     this.entries.set(id, entry);
     this.wire(entry);
     this.watchArtifacts(entry);
@@ -393,14 +417,36 @@ export class SessionManager extends EventEmitter {
       throw e;
     }
 
-    if (input.kickoff) session.send(input.kickoff);
-    else if (!input.noKickoff) session.send(buildKickoffMessage({ repoUrl: repoUrl ?? undefined, facts: facts ?? undefined }));
+    if (input.kickoff) this.startTurn(entry, input.kickoff, true);
+    else if (!input.noKickoff) this.startTurn(entry, buildKickoffMessage({ repoUrl: repoUrl ?? undefined, facts: facts ?? undefined }), true);
 
     return summary;
   }
 
   send(id: string, text: string): void {
-    this.mustGet(id).session.send(text);
+    this.startTurn(this.mustGet(id), text, false);
+  }
+
+  /** Sends a message and marks the session busy until the result comes back. */
+  private startTurn(entry: Entry, text: string, kickoff: boolean): void {
+    entry.turnStartedAt = Date.now();
+    entry.firstTextAt = null;
+    entry.summary.busy = true;
+    this.record(entry, "user_text", { text, kickoff });
+    this.emit("session.updated", entry.summary);
+    entry.session.send(text);
+  }
+
+  private pushDraft(entry: Entry, flush = false): void {
+    if (entry.draftTimer && !flush) return;
+    const fire = () => {
+      entry.draftTimer = null;
+      this.emit("session.draft", entry.summary.id, entry.draft);
+    };
+    if (flush) {
+      if (entry.draftTimer) clearTimeout(entry.draftTimer);
+      fire();
+    } else entry.draftTimer = setTimeout(fire, 80);
   }
 
   async interrupt(id: string): Promise<void> {
@@ -491,7 +537,15 @@ export class SessionManager extends EventEmitter {
       this.record(entry, "init", info);
       updated();
     });
+    session.on("assistant_delta", (text: string) => {
+      if (entry.firstTextAt === null) entry.firstTextAt = Date.now();
+      entry.draft += text;
+      this.pushDraft(entry);
+    });
     session.on("assistant_text", (text: string) => {
+      if (entry.firstTextAt === null) entry.firstTextAt = Date.now();
+      entry.draft = "";
+      this.pushDraft(entry, true);
       this.record(entry, "assistant_text", { text });
       // Claude Code reports a bad model choice as an assistant message and ends the
       // turn at zero cost; make it a visible session error rather than chat to read.
@@ -510,15 +564,34 @@ export class SessionManager extends EventEmitter {
     });
     session.on("turn", ({ result, state, stateError }: TurnEvent) => {
       const r = result as Record<string, unknown>;
+      const now = Date.now();
+      const timing: TurnTiming | null = entry.turnStartedAt
+        ? {
+            wallMs: now - entry.turnStartedAt,
+            apiMs: typeof r.duration_api_ms === "number" ? r.duration_api_ms : null,
+            firstTextMs: entry.firstTextAt ? entry.firstTextAt - entry.turnStartedAt : null,
+            numTurns: typeof result.num_turns === "number" ? result.num_turns : null,
+            costUsd: typeof r.total_cost_usd === "number" ? r.total_cost_usd : null,
+          }
+        : null;
+      entry.turnStartedAt = null;
+      entry.draft = "";
+      this.pushDraft(entry, true);
+      summary.busy = false;
+      summary.lastTurn = timing;
       this.record(entry, "turn", {
         subtype: result.subtype,
         is_error: result.is_error,
         num_turns: result.num_turns,
         total_cost_usd: r.total_cost_usd ?? null,
+        duration_ms: r.duration_ms ?? null,
+        duration_api_ms: r.duration_api_ms ?? null,
+        timing,
         session_id: result.session_id,
         state,
         stateError: stateError ?? null,
       });
+      updated();
     });
     session.on("fragility", (r: FragilityReport) => {
       // Only whole-repo reports serve as the overlay's default; narrowed ones are still streamed.
@@ -534,12 +607,14 @@ export class SessionManager extends EventEmitter {
     session.on("message", (m: unknown) => this.record(entry, "message", m));
     session.on("error", (e: Error) => {
       summary.status = "error";
+      summary.busy = false;
       summary.lastError = e.message;
       this.record(entry, "error", { message: e.message });
       updated();
     });
     session.on("end", () => {
       if (summary.status !== "error") summary.status = "ended";
+      summary.busy = false;
       this.record(entry, "end", null);
       updated();
     });

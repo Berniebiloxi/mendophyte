@@ -1,4 +1,5 @@
 import type { ForgeInfo } from "./forge.js";
+import { childEnv } from "../env.js";
 import { failureReason, run } from "./run.js";
 
 /**
@@ -71,7 +72,7 @@ async function probeLsRemote(repoDir: string): Promise<CapabilityReport["lsRemot
   const r = await run("git", ["ls-remote", "--symref", "origin"], {
     cwd: repoDir,
     timeoutMs: PROBE_TIMEOUT_MS,
-    env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+    env: childEnv({ GIT_TERMINAL_PROMPT: "0" }),
   });
   if (!r.ok) return { source: r.cmd, ok: false, summary: failureReason(r), refCount: null, headTarget: null };
   const lines = r.stdout.split(/\r?\n/).filter(Boolean);

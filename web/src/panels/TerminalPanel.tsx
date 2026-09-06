@@ -4,6 +4,7 @@ import { Terminal, type ITheme } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { api } from "../api.js";
 import { store, useActiveSession, useUi } from "../store.js";
+import { diag } from "../diag.js";
 
 /**
  * Your shell, in the clone. Not the agent's session: nothing typed here is
@@ -40,7 +41,7 @@ export function TerminalPanel(props: IDockviewPanelProps<{ termId?: string }>) {
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
-  const [status, setStatus] = useState<"starting" | "live" | "exited" | "error">("starting");
+  const [status, setStatus] = useState<"starting" | "live" | "reconnecting" | "exited" | "error">("starting");
   const [error, setError] = useState<string | null>(null);
   const [termId, setTermId] = useState<string | undefined>(props.params.termId);
   // A terminal binds to the session that is active when it first can (the
@@ -89,40 +90,72 @@ export function TerminalPanel(props: IDockviewPanelProps<{ termId?: string }>) {
         return;
       }
       if (disposed) return;
-      const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws/terminal/${id}`);
-      ws.binaryType = "arraybuffer";
-      wsRef.current = ws;
-      ws.onopen = () => {
-        setStatus("live");
-        ws.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
-        term.focus();
-      };
-      ws.onmessage = (ev) => {
-        if (ev.data instanceof ArrayBuffer) term.write(new Uint8Array(ev.data));
-        else {
-          try {
-            const m = JSON.parse(String(ev.data));
-            if (m.type === "exit") setStatus("exited");
-            if (m.type === "hello" && m.terminal?.shell) props.api.setTitle(`Terminal · ${String(m.terminal.shell).split(/[\\/]/).pop()}`);
-          } catch {
-            term.write(String(ev.data));
+      // Input goes through whichever socket is current. If the socket drops
+      // (server restart, sleep/wake, a proxy idling), reconnect with backoff
+      // instead of silently discarding keystrokes, and say so in the debug log.
+      let exited = false;
+      let attempt = 0;
+      let dropped = 0;
+      const open = () => {
+        if (disposed || exited) return;
+        const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws/terminal/${id}`);
+        ws.binaryType = "arraybuffer";
+        wsRef.current = ws;
+        ws.onopen = () => {
+          diag(`terminal ${id} socket open${attempt ? ` (reconnect #${attempt}${dropped ? `, ${dropped} keystrokes were dropped while down` : ""})` : ""}`);
+          attempt = 0;
+          dropped = 0;
+          setStatus("live");
+          setError(null);
+          ws.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
+          term.focus();
+        };
+        ws.onmessage = (ev) => {
+          if (ev.data instanceof ArrayBuffer) term.write(new Uint8Array(ev.data));
+          else {
+            try {
+              const m = JSON.parse(String(ev.data));
+              if (m.type === "exit") { exited = true; setStatus("exited"); }
+              if (m.type === "hello" && m.terminal?.shell) props.api.setTitle(`Terminal · ${String(m.terminal.shell).split(/[\\/]/).pop()}`);
+            } catch {
+              term.write(String(ev.data));
+            }
           }
-        }
+        };
+        ws.onerror = () => diag(`terminal ${id} socket error`);
+        ws.onclose = (ev) => {
+          if (disposed || exited) return;
+          diag(`terminal ${id} socket closed code=${ev.code} reason="${ev.reason}"`);
+          if (ev.code === 4404) {
+            setStatus("error");
+            setError("This terminal no longer exists on the server (it restarted). Close the tab and open a new one.");
+            return;
+          }
+          setStatus("reconnecting");
+          const delay = Math.min(8000, 400 * 2 ** attempt++);
+          setTimeout(open, delay);
+        };
       };
-      ws.onclose = (ev) => {
-        if (disposed) return;
-        if (ev.code === 4404) {
-          setStatus("error");
-          setError("This terminal no longer exists on the server (it restarted). Close the tab and open a new one.");
-        } else if (status !== "exited") setStatus((st) => (st === "exited" ? st : "error"));
+      open();
+      const send = (data: Uint8Array) => {
+        const ws = wsRef.current;
+        if (ws && ws.readyState === WebSocket.OPEN) ws.send(data);
+        else dropped += 1;
       };
-      term.onData((d) => ws.readyState === WebSocket.OPEN && ws.send(new TextEncoder().encode(d)));
-      term.onBinary((d) => ws.readyState === WebSocket.OPEN && ws.send(Uint8Array.from(d, (c) => c.charCodeAt(0))));
-      term.onResize(({ cols, rows }) => ws.readyState === WebSocket.OPEN && ws.send(JSON.stringify({ type: "resize", cols, rows })));
+      term.onData((d) => send(new TextEncoder().encode(d)));
+      term.onBinary((d) => send(Uint8Array.from(d, (c) => c.charCodeAt(0))));
+      term.onResize(({ cols, rows }) => {
+        const ws = wsRef.current;
+        if (ws && ws.readyState === WebSocket.OPEN && cols > 1 && rows > 0) ws.send(JSON.stringify({ type: "resize", cols, rows }));
+      });
     };
     void connect();
 
-    const ro = new ResizeObserver(() => {
+    // Fit only when the host has a real size; fitting a hidden or collapsing
+    // panel produces 0-column resizes that confuse the shell.
+    const ro = new ResizeObserver((entries) => {
+      const r = entries[0]?.contentRect;
+      if (!r || r.width < 40 || r.height < 20) return;
       try {
         fit.fit();
       } catch {
@@ -173,14 +206,14 @@ export function TerminalPanel(props: IDockviewPanelProps<{ termId?: string }>) {
         <span className="faint">
           your shell in <code>{s?.repoDir ?? ""}</code> · not the agent’s, not gated
         </span>
-        <span className={`tag ${status === "live" ? "ok" : status === "error" ? "bad" : ""}`}>{status}</span>
+        <span className={`tag ${status === "live" ? "ok" : status === "error" ? "bad" : status === "reconnecting" ? "warn" : ""}`}>{status}</span>
         <button className="btn sm" onClick={() => store.setTermFontSize(termFontSize - 1)} title="smaller">A−</button>
         <button className="btn sm" onClick={() => store.setTermFontSize(termFontSize + 1)} title="larger">A+</button>
         <button className="btn sm" onClick={() => termRef.current?.clear()} title="clear scrollback">clear</button>
         <button className="btn sm" onClick={kill} title="kill the shell and close the tab">kill</button>
       </div>
       {error && <div className="tag bad" style={{ margin: "6px 8px", whiteSpace: "normal" }}>{error}</div>}
-      <div className="term-host" ref={host} />
+      <div className="term-host" ref={host} onMouseDown={() => termRef.current?.focus()} />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef, useState } from "react";
 import { api } from "../api.js";
-import { store, useActiveSession, useSessionEvents } from "../store.js";
+import { store, useActiveSession, useSessionEvents, useUi } from "../store.js";
 import type { AnyEvent } from "../types.js";
 
 function toolLine(data: any): string {
@@ -19,15 +19,29 @@ const Entry = memo(function Entry({ e }: { e: AnyEvent }) {
   switch (e.event) {
     case "assistant_text":
       return <div className="msg assistant">{(e.data as any).text}</div>;
-    case "user_text":
-      return <div className="msg user">{(e.data as any).text}</div>;
+    case "user_text": {
+      const d = e.data as { text: string; kickoff?: boolean };
+      if (d.kickoff)
+        return (
+          <details className="msg kickoff">
+            <summary>Kickoff sent to the agent: the entry prompt plus the pre-flight facts</summary>
+            <div className="kickoff-body">{d.text}</div>
+          </details>
+        );
+      return <div className="msg user">{d.text}</div>;
+    }
     case "tool_use":
       return <div className="msg tool">▸ {toolLine(e.data)}</div>;
     case "turn": {
       const d = e.data as any;
+      const t = d.timing as { wallMs: number; apiMs: number | null; firstTextMs: number | null } | null | undefined;
+      const secs = (ms: number) => `${(ms / 1000).toFixed(1)}s`;
       return (
-        <div className="msg turn">
-          turn {d.subtype}{d.total_cost_usd != null ? ` · $${Number(d.total_cost_usd).toFixed(3)} so far` : ""}{d.stateError ? ` · no state: ${d.stateError}` : ""}
+        <div className="msg turn" title={t ? `From your message to the result: ${secs(t.wallMs)} wall clock, of which the model API took ${t.apiMs != null ? secs(t.apiMs) : "?"}. First streamed text after ${t.firstTextMs != null ? secs(t.firstTextMs) : "?"}. The gap between wall and API time is tool execution and process overhead.` : undefined}>
+          turn {d.subtype}
+          {t ? ` · ${secs(t.wallMs)}${t.apiMs != null ? ` (api ${secs(t.apiMs)})` : ""}` : ""}
+          {d.total_cost_usd != null ? ` · ${Number(d.total_cost_usd).toFixed(3)} so far` : ""}
+          {d.stateError ? ` · no state: ${d.stateError}` : ""}
         </div>
       );
     }
@@ -44,9 +58,21 @@ const Entry = memo(function Entry({ e }: { e: AnyEvent }) {
   }
 });
 
+/** Themed loader: three leaves unfurling in turn (pure CSS, see .thinking). */
+function Thinking({ label }: { label: string }) {
+  return (
+    <div className="msg thinking" role="status" aria-live="polite">
+      <span className="leaves"><i /><i /><i /></span>
+      <span className="muted">{label}</span>
+    </div>
+  );
+}
+
 export function ConversationPanel() {
   const s = useActiveSession();
   const list = useSessionEvents(s?.id);
+  const draft = useUi((st) => (s ? st.drafts[s.id] : undefined) ?? "");
+  const working = !!s?.busy && s.status === "running";
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
@@ -55,7 +81,7 @@ export function ConversationPanel() {
   useEffect(() => {
     const el = logRef.current;
     if (el && stick.current) el.scrollTop = el.scrollHeight;
-  }, [list.length]);
+  }, [list.length, draft.length, working]);
 
   const send = async () => {
     const t = text.trim();
@@ -86,6 +112,8 @@ export function ConversationPanel() {
         {list.map((e) => (
           <Entry key={`${e.seq}`} e={e} />
         ))}
+        {draft && <div className="msg assistant draft">{draft}<span className="caret" /></div>}
+        {working && !draft && <Thinking label={list.length ? "working…" : "reading the prompt and your repo…"} />}
       </div>
       <div className="conv-input">
         <textarea

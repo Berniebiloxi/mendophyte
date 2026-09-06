@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { childEnv } from "../env.js";
 
 /**
  * Result of a shell probe. Never throws: a missing binary, a non-zero exit
@@ -29,7 +30,7 @@ export function run(
         cwd: opts.cwd,
         timeout: opts.timeoutMs ?? 15_000,
         maxBuffer: 8 * 1024 * 1024,
-        env: opts.env ?? process.env,
+        env: opts.env ?? childEnv(),
         windowsHide: true,
       },
       (err, stdout, stderr) => {

@@ -74,7 +74,8 @@ export async function createMendophyteServer(opts: { port: number; host?: string
       case "assistant_text": what = `agent: ${brief(d?.text, 300)}`; break;
       case "tool_use": what = `tool ${d?.name} ${brief(d?.input, 300)}`; break;
       case "tool_allowed": what = `allowed ${d?.toolName ?? d?.name ?? ""} ${brief(d?.command ?? d?.input, 200)}`; break;
-      case "turn": what = `turn ${d?.subtype} cost=${d?.total_cost_usd ?? "?"} turns=${d?.num_turns ?? "?"}${d?.stateError ? ` stateError=${brief(d.stateError, 200)}` : ""}`; break;
+      case "turn": what = `turn ${d?.subtype} cost=${d?.total_cost_usd ?? "?"} turns=${d?.num_turns ?? "?"}${d?.timing ? ` latency: first text ${d.timing.firstTextMs ?? "?"}ms, result ${d.timing.wallMs}ms wall / ${d.timing.apiMs ?? "?"}ms api` : ""}${d?.stateError ? ` stateError=${brief(d.stateError, 200)}` : ""}`; break;
+      case "user_text": what = `${d?.kickoff ? "kickoff" : "user"}: ${brief(d?.text, 200)}`; break;
       case "state": what = `state phase=${d?.phase} complete=${d?.phase_complete} yourTurn=${brief((d?.your_turn_items ?? []).map((i: any) => `${i.id}:${i.kind}:${i.blocks}`), 300)}`; break;
       case "error": what = `ERROR ${brief(d?.message ?? d, 400)}`; break;
       case "verification": what = `verification ${d?.allPassed ? "all passed" : `${d?.counts?.failed ?? "?"} failed`} (${d?.results?.length ?? "?"} checks) run=${d?.id ?? ""}`; break;
@@ -108,7 +109,11 @@ export async function createMendophyteServer(opts: { port: number; host?: string
   });
   app.get("/api/diag", (req, res) => {
     const n = Math.min(2000, Math.max(20, Number(req.query.tail ?? 300) || 300));
-    res.json({ path: diag.path, size: diag.size(), tail: diag.tail(n) });
+    res.json({ path: diag.path, size: diag.size(), enabled: diag.isEnabled, tail: diag.tail(n) });
+  });
+  app.post("/api/diag/enabled", (req, res) => {
+    diag.setEnabled(req.body?.enabled !== false);
+    res.json({ enabled: diag.isEnabled });
   });
   app.get("/api/diag/download", (_req, res) => {
     res.setHeader("content-type", "text/markdown; charset=utf-8");
@@ -164,7 +169,7 @@ export async function createMendophyteServer(opts: { port: number; host?: string
 }
 
 /** Kept for the CLI: starts the server and resolves to its URL. */
-export async function startServer(port: number): Promise<{ url: string; logPath: string }> {
+export async function startServer(port: number, diagIn?: DiagnosticLog): Promise<{ url: string; logPath: string }> {
   let factory: SessionFactory | undefined;
   if (process.env.MENDOPHYTE_FAKE_SESSION === "1") {
     const { FakeSession } = await import("./fake-session.js");
@@ -181,7 +186,7 @@ export async function startServer(port: number): Promise<{ url: string; logPath:
     setTimeout(() => process.exit(1), 4000).unref();
     void handle.close().finally(() => process.exit(0));
   };
-  const diag = new DiagnosticLog({ enabled: process.env.MENDOPHYTE_NO_DIAG !== "1" });
+  const diag = diagIn ?? new DiagnosticLog({ enabled: process.env.MENDOPHYTE_NO_DIAG !== "1" });
   const handle = await createMendophyteServer({ port, factory, onShutdown: () => shutdown("shutdown requested"), diag });
   process.once("SIGINT", () => shutdown("SIGINT"));
   process.once("SIGTERM", () => shutdown("SIGTERM"));

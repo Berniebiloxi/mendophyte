@@ -97,6 +97,14 @@ MENDOPHYTE_FAKE_SESSION=1 npm start
 
 ## Troubleshooting
 
+**Is the agent working or stuck?** While a turn is in progress the
+conversation shows the agent's text as it streams, a leaf loader when
+nothing has arrived yet, and "working" in the menubar. Each finished turn
+prints its timing: wall-clock from your message to the result, and in
+brackets the time the model API itself took (hover the line for the
+breakdown). The rest is tool execution and process overhead. The same
+numbers land in the debug log as `latency:` entries.
+
 **UI size.** Everything scales from one number: **View → UI size**.
 "Auto" picks a size from the screen the window is on (100% on laptops,
 110–130% on wide desktop monitors) and follows the window between
@@ -109,7 +117,16 @@ under `~/.mendophyte/logs/` (the path is printed at startup and shown in
 event, approval, question, button press, field change, store action and
 JS error, with anything that looks like a token redacted. To report a
 problem: press **Mark this moment** in the Debug log panel right after
-it happens, then send the file. `MENDOPHYTE_NO_DIAG=1` turns it off.
+it happens, then send the file. The panel's **Pause collection** button
+stops writing (and **Resume** restarts it); `MENDOPHYTE_NO_DIAG=1` starts
+with it off. Startup output printed by the CLI is mirrored into the log.
+
+**Terminal stopped taking input.** The panel's tag shows `reconnecting`
+if its socket dropped; it reconnects on its own and reports dropped
+keystrokes in the debug log. Shells are login + interactive, and inherit a
+cleaned environment: the `npm_*` variables `npm start` sets are stripped,
+otherwise `npm`, `yarn` and `pnpm` run inside the terminal act on
+Mendophyte's own package instead of the repo you are in.
 
 - **`npm install` fails building node-pty (Linux):** install python3 and
   a C++ toolchain (`sudo apt install build-essential python3` on

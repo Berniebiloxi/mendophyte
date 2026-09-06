@@ -1,6 +1,6 @@
 // Type-only imports from the server: erased at build time, so the web
 // bundle never pulls node modules in, but the wire format stays one source.
-export type { SessionSummary, SessionEvent, SessionEventName, ApprovalView, QuestionView, SessionStatus } from "../../src/server/session-manager.js";
+export type { SessionSummary, SessionEvent, SessionEventName, ApprovalView, QuestionView, SessionStatus, TurnTiming } from "../../src/server/session-manager.js";
 export type { AskQuestion, QuestionAnswers } from "../../src/orchestrator/approvals.js";
 export type { SessionState, YourTurnItem, Triage, TriageCandidate, DeepAssessment, CriterionScore } from "../../src/orchestrator/schema.js";
 export type { PreflightReport } from "../../src/orchestrator/preflight/index.js";

@@ -3,6 +3,35 @@ import type { DockviewApi } from "dockview";
 import { PANELS, buildDefaultLayout, deleteNamedLayout, loadNamedLayout, namedLayouts, newTerminal, saveNamedLayout, showPanel } from "./layout.js";
 import { api as rest } from "./api.js";
 import { UI_SCALE_STEPS, autoUiScale, store, useActiveSession, useUi } from "./store.js";
+import { diag } from "./diag.js";
+
+/** A checkmark that does not depend on the system font having the glyph. */
+function Check({ on }: { on: boolean }) {
+  return (
+    <span className="check" aria-hidden="true">
+      {on && (
+        <svg viewBox="0 0 12 12" width="12" height="12"><path d="M2 6.5 L5 9.2 L10 3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+      )}
+    </span>
+  );
+}
+
+/** A flyout inside a menu: opens on hover or click, to the right; keeps the parent menu short. */
+function SubMenu({ label, hint, children }: { label: string; hint?: React.ReactNode; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const timer = useRef<number | null>(null);
+  const show = () => { if (timer.current) window.clearTimeout(timer.current); setOpen(true); };
+  const hide = () => { timer.current = window.setTimeout(() => setOpen(false), 160); };
+  return (
+    <div className={`submenu${open ? " open" : ""}`} onMouseEnter={show} onMouseLeave={hide}>
+      <button type="button" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+        <span>{label}</span>
+        <span className="kbd">{hint}<span className="chev">›</span></span>
+      </button>
+      {open && <div className="menu-list sub" role="menu">{children}</div>}
+    </div>
+  );
+}
 
 function Menu({ label, children }: { label: string; children: (close: () => void) => React.ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -36,6 +65,21 @@ export function Menubar({ api }: { api: DockviewApi | null }) {
   const scheme = useUi((st) => st.scheme);
   const termFontSize = useUi((st) => st.termFontSize);
   const uiScale = useUi((st) => st.uiScale);
+  // Re-render when panels open/close so the checkmarks stay honest.
+  const [, bump] = useState(0);
+  useEffect(() => {
+    if (!api) return;
+    const a = api.onDidAddPanel(() => bump((n) => n + 1));
+    const r = api.onDidRemovePanel(() => bump((n) => n + 1));
+    return () => { a.dispose(); r.dispose(); };
+  }, [api]);
+  const togglePanel = (id: (typeof PANELS)[number]["id"]) => {
+    if (!api) return;
+    const p = api.getPanel(id);
+    if (p) { diag(`close panel ${id}`); p.api.close(); }
+    else showPanel(api, id);
+  };
+  const openCount = api ? PANELS.filter((p) => api.getPanel(p.id)).length : 0;
   const active = useActiveSession();
   const [layouts, setLayouts] = useState<string[]>(() => Object.keys(namedLayouts()));
   const refreshLayouts = () => setLayouts(Object.keys(namedLayouts()));
@@ -79,36 +123,49 @@ export function Menubar({ api }: { api: DockviewApi | null }) {
       <Menu label="View">
         {(close) => (
           <>
-            {PANELS.map((p) => (
-              <button key={p.id} onClick={() => { api && showPanel(api, p.id); close(); }}>
-                {p.title} {api?.getPanel(p.id) ? <span className="kbd">open</span> : null}
-              </button>
-            ))}
-            <button onClick={() => { api && newTerminal(api); close(); }}>New terminal <span className="kbd">your shell in the clone</span></button>
-            <hr />
-            <button onClick={() => { api && buildDefaultLayout(api); close(); }}>Reset layout</button>
-            <button onClick={() => { const n = prompt("Layout name"); if (n && api) { saveNamedLayout(api, n); refreshLayouts(); } close(); }}>Save layout as…</button>
-            {layouts.map((n) => (
-              <button key={n} onClick={() => { api && loadNamedLayout(api, n); close(); }}>
-                Load “{n}”
-                <span className="kbd" onClick={(e) => { e.stopPropagation(); deleteNamedLayout(n); refreshLayouts(); }} title="delete">✕</span>
-              </button>
-            ))}
-            <hr />
-            <button onClick={() => { store.setTheme("vine"); close(); }}>Theme: Vine {theme === "vine" ? <span className="kbd">●</span> : null}</button>
-            <button onClick={() => { store.setTheme("minimal"); close(); }}>Theme: Minimal {theme === "minimal" ? <span className="kbd">●</span> : null}</button>
-            <hr />
-            {(["auto", "light", "dark"] as const).map((s) => (
-              <button key={s} onClick={() => { store.setScheme(s); close(); }}>Scheme: {s} {scheme === s ? <span className="kbd">●</span> : null}</button>
-            ))}
-            <hr />
-            <button onClick={() => { store.setUiScale("auto"); close(); }}>UI size: auto for this screen <span className="kbd">{Math.round(autoUiScale() * 100)}% {uiScale === "auto" ? "●" : ""}</span></button>
-            {UI_SCALE_STEPS.map((sc) => (
-              <button key={sc} onClick={() => { store.setUiScale(sc); close(); }}>UI size: {Math.round(sc * 100)}% {uiScale === sc ? <span className="kbd">●</span> : null}</button>
-            ))}
-            <hr />
-            <button onClick={() => store.setTermFontSize(termFontSize + 1)}>Terminal font larger <span className="kbd">{termFontSize}px</span></button>
-            <button onClick={() => store.setTermFontSize(termFontSize - 1)}>Terminal font smaller</button>
+            <SubMenu label="Panels" hint={`${openCount}/${PANELS.length} open`}>
+              {PANELS.map((p) => {
+                const open = !!api?.getPanel(p.id);
+                return (
+                  <button key={p.id} role="menuitemcheckbox" aria-checked={open} className={open ? "checked" : ""} onClick={() => togglePanel(p.id)}>
+                    <span><Check on={open} />{p.title}</span>
+                  </button>
+                );
+              })}
+              <hr />
+              <button onClick={() => { api && newTerminal(api); close(); }}><span><Check on={false} />New terminal</span> <span className="kbd">your shell in the clone</span></button>
+            </SubMenu>
+            <SubMenu label="Layout" hint={layouts.length ? `${layouts.length} saved` : undefined}>
+              <button onClick={() => { api && buildDefaultLayout(api); close(); }}>Reset to default</button>
+              <button onClick={() => { const n = prompt("Layout name"); if (n && api) { saveNamedLayout(api, n); refreshLayouts(); } close(); }}>Save current as…</button>
+              {layouts.length > 0 && <hr />}
+              {layouts.map((n) => (
+                <button key={n} onClick={() => { api && loadNamedLayout(api, n); close(); }}>
+                  Load “{n}”
+                  <span className="kbd" onClick={(e) => { e.stopPropagation(); deleteNamedLayout(n); refreshLayouts(); }} title="delete">✕</span>
+                </button>
+              ))}
+            </SubMenu>
+            <SubMenu label="Appearance" hint={`${theme} · ${scheme}`}>
+              <button onClick={() => { store.setTheme("vine"); close(); }}><span><Check on={theme === "vine"} />Theme: Vine</span></button>
+              <button onClick={() => { store.setTheme("minimal"); close(); }}><span><Check on={theme === "minimal"} />Theme: Minimal</span></button>
+              <hr />
+              {(["auto", "light", "dark"] as const).map((s) => (
+                <button key={s} onClick={() => { store.setScheme(s); close(); }}><span><Check on={scheme === s} />Scheme: {s}</span></button>
+              ))}
+            </SubMenu>
+            <SubMenu label="UI size" hint={uiScale === "auto" ? `auto · ${Math.round(autoUiScale() * 100)}%` : `${Math.round(uiScale * 100)}%`}>
+              <button onClick={() => { store.setUiScale("auto"); close(); }}><span><Check on={uiScale === "auto"} />Auto for this screen</span> <span className="kbd">{Math.round(autoUiScale() * 100)}%</span></button>
+              <hr />
+              {UI_SCALE_STEPS.map((sc) => (
+                <button key={sc} onClick={() => { store.setUiScale(sc); close(); }}><span><Check on={uiScale === sc} />{Math.round(sc * 100)}%</span></button>
+              ))}
+            </SubMenu>
+            <SubMenu label="Terminal font" hint={`${termFontSize}px`}>
+              <button onClick={() => store.setTermFontSize(termFontSize + 1)}>Larger</button>
+              <button onClick={() => store.setTermFontSize(termFontSize - 1)}>Smaller</button>
+              <button onClick={() => store.setTermFontSize(13)}>Reset to 13px</button>
+            </SubMenu>
           </>
         )}
       </Menu>
@@ -116,7 +173,7 @@ export function Menubar({ api }: { api: DockviewApi | null }) {
       <Menu label="Help">
         {(close) => (
           <>
-            <button onClick={() => { api && showPanel(api, "debug"); close(); }}>Debug log <span className="kbd">for bug reports</span></button>
+            <button role="menuitemcheckbox" aria-checked={!!api?.getPanel("debug")} onClick={() => { togglePanel("debug"); close(); }}><span><Check on={!!api?.getPanel("debug")} />Debug log</span> <span className="kbd">for bug reports</span></button>
             <hr />
             <button onClick={() => { window.open("https://github.com/anthropics/claude-agent-sdk-typescript", "_blank"); close(); }}>Agent SDK docs</button>
             <button onClick={() => { alert("Mendophyte 0.1.0\nLocal cockpit for AI-assisted open-source contribution work."); close(); }}>About</button>
@@ -127,6 +184,9 @@ export function Menubar({ api }: { api: DockviewApi | null }) {
       <div className="menubar-status">
         {nApprovals > 0 && <span className="attention">{nApprovals} awaiting your confirmation</span>}
         {nQuestions > 0 && <span className="attention bloom">{nQuestions} question{nQuestions === 1 ? "" : "s"} for you</span>}
+        {active?.busy && active.status === "running" && (
+          <span className="working" title="The agent is working on a reply"><span className="leaves sm"><i /><i /><i /></span> working</span>
+        )}
         {active && (
           <span title={active.repoDir}>
             {active.repoDir.split(/[\\/]/).pop()} · {active.status}

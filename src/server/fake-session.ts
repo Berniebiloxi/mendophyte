@@ -45,6 +45,10 @@ export class FakeSession extends EventEmitter implements SessionLike {
   }
 
   private say(text: string) {
+    // a few streamed slices first, as the real SDK does with includePartialMessages
+    const words = text.split(" ");
+    const step = Math.max(1, Math.ceil(words.length / 4));
+    for (let i = 0; i < words.length; i += step) this.emit("assistant_delta", (i ? " " : "") + words.slice(i, i + step).join(" "));
     this.emit("assistant_text", text);
   }
   private tool(name: string, input: unknown) {

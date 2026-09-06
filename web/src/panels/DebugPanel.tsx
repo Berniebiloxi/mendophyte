@@ -9,7 +9,7 @@ import { diag } from "../diag.js";
  * the file over is the whole bug report.
  */
 export function DebugPanel() {
-  const [info, setInfo] = useState<{ path: string; size: number; tail: string } | null>(null);
+  const [info, setInfo] = useState<{ path: string; size: number; enabled: boolean; tail: string } | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [follow, setFollow] = useState(true);
   const [filter, setFilter] = useState("");
@@ -61,6 +61,11 @@ export function DebugPanel() {
             <a className="btn sm" href="/api/diag/download" download onClick={() => diag("download debug log")}>Download</a>
             <button className="btn sm" onClick={() => { diag("marker: user pressed 'Mark this moment'"); load(); }} title="Writes a marker line so you can say 'the bug happened right after the marker'">Mark this moment</button>
             <label className="row" style={{ gap: 4 }}><input type="checkbox" checked={follow} onChange={(e) => setFollow(e.target.checked)} /> follow</label>
+            <span className="grow" />
+            <button className={`btn sm ${info.enabled ? "" : "primary"}`} onClick={() => api.setDiagEnabled(!info.enabled).then(load).catch((e) => store.toast(e.message))} title={info.enabled ? "Stop writing to the log (the file stays; nothing is collected until resumed)" : "Resume writing to the log"}>
+              {info.enabled ? "Pause collection" : "Resume collection"}
+            </button>
+            <span className={`tag ${info.enabled ? "ok" : "warn"}`}>{info.enabled ? "collecting" : "paused"}</span>
           </div>
         </div>
       )}

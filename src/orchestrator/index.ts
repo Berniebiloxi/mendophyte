@@ -1,3 +1,4 @@
+export { childEnv } from "./env.js";
 export {
   MendophyteSession,
   buildKickoffMessage,

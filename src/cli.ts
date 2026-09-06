@@ -2,6 +2,7 @@
 import { Command } from "commander";
 import open from "open";
 import { startServer } from "./server/index.js";
+import { DiagnosticLog } from "./server/diag.js";
 import { findListener, killHolder, probeInstance, requestShutdown } from "./server/probe.js";
 
 const program = new Command();
@@ -78,10 +79,21 @@ program
       return;
     }
 
+    // The debug log starts before the server so startup output lands in it too.
+    const diag = new DiagnosticLog({ enabled: process.env.MENDOPHYTE_NO_DIAG !== "1" });
+    for (const level of ["log", "warn", "error"] as const) {
+      const orig = console[level].bind(console);
+      console[level] = (...args: unknown[]) => {
+        orig(...args);
+        diag.log(level === "error" ? "error" : "server", `[stdout] ${args.map((a) => (typeof a === "string" ? a : JSON.stringify(a))).join(" ")}`);
+      };
+    }
+    process.on("warning", (w) => diag.log("server", `node warning: ${w.name}: ${w.message}`));
+    diag.log("server", `launched: node ${process.version}, argv ${JSON.stringify(process.argv.slice(2))}${process.env.npm_lifecycle_event ? `, via npm ${process.env.npm_lifecycle_event} (${process.env.npm_config_user_agent ?? "npm"})` : ""}, cwd ${process.cwd()}`);
     let url: string;
     let logPath = "";
     try {
-      ({ url, logPath } = await startServer(port));
+      ({ url, logPath } = await startServer(port, diag));
     } catch (e) {
       if ((e as NodeJS.ErrnoException)?.code !== "EADDRINUSE") {
         console.error(e instanceof Error ? e.message : String(e));
@@ -94,7 +106,7 @@ program
         console.log(`Port ${port} is held by a Mendophyte process that isn't responding (pid ${holder.pid}); stopping it…`);
         if (await killHolder(holder, port)) {
           try {
-            ({ url, logPath } = await startServer(port));
+            ({ url, logPath } = await startServer(port, diag));
           } catch (e2) {
             console.error(e2 instanceof Error ? e2.message : String(e2));
             process.exitCode = 1;

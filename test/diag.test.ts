@@ -35,6 +35,15 @@ test("diag: the log file is markdown, the endpoints serve and accept entries, se
     assert.match(get.tail, /\| error \| boom \[redacted\] \|/);
     assert.doesNotMatch(get.tail, /ghp_/);
     assert.doesNotMatch(get.tail, /\/api\/diag/, "the log does not log itself");
+    // pause: nothing is written; resume: writing continues, with markers either side
+    assert.equal((await (await fetch(`${base}/api/diag/enabled`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ enabled: false }) })).json()).enabled, false);
+    await fetch(`${base}/api/sessions`);
+    assert.equal((await (await fetch(`${base}/api/diag?tail=50`)).json()).enabled, false);
+    assert.equal((await (await fetch(`${base}/api/diag/enabled`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ enabled: true }) })).json()).enabled, true);
+    const afterPause = (await (await fetch(`${base}/api/diag?tail=50`)).json()).tail as string;
+    assert.match(afterPause, /log collection paused by the user/);
+    assert.match(afterPause, /log collection resumed by the user/);
+    assert.equal((afterPause.match(/GET \/api\/sessions → 200/g) ?? []).length, 1, "the request made while paused was not logged");
     const dl = await fetch(`${base}/api/diag/download`);
     assert.equal(dl.status, 200);
     assert.match(dl.headers.get("content-type") ?? "", /markdown/);
