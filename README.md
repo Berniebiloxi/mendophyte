@@ -105,6 +105,19 @@ brackets the time the model API itself took (hover the line for the
 breakdown). The rest is tool execution and process overhead. The same
 numbers land in the debug log as `latency:` entries.
 
+**Snapshots.** **File → Save snapshot** writes a Markdown record of the
+session (conversation, last dashboard state, verification runs,
+submission) into the artifact home under `snapshots/`; **File → Export
+session…** downloads the same file. **Prior projects** in the Session
+panel lists every artifact home with Rename, Move and Delete; a home a
+running session is using is locked until that session ends.
+
+**The progress tree moves mid-turn.** The dashboard state only arrives
+when a turn ends, and a turn can run through several phases when the
+agent asks questions (AskUserQuestion keeps the turn open). The tree also
+follows the agent reading `prompts/0N-*.md`, so it advances the moment
+the agent opens the next phase's prompt.
+
 **UI size.** Everything scales from one number: **View → UI size**.
 "Auto" picks a size from the screen the window is on (100% on laptops,
 110–130% on wide desktop monitors) and follows the window between
@@ -219,6 +232,11 @@ DELETE /api/sessions/:id              force-close and forget
 GET    /api/approvals                 guardrail commands waiting on a human
 POST   /api/approvals/:id             { approved, reason? }
 GET    /api/questions                 AskUserQuestion calls waiting on a human
+POST   /api/sessions/:id/snapshot     write a Markdown session record to <artifactHome>/snapshots/
+GET    /api/sessions/:id/snapshot.md  the same record as a download
+POST   /api/projects/:name/rename     { to }        rename an artifact home under ~/.mendophyte
+POST   /api/projects/:name/move       { to }        move it to any new path
+DELETE /api/projects/:name                          delete it (refused while a session uses it)
 GET    /api/diag                      debug log path, size and tail; /api/diag/download serves the file
 POST   /api/diag                      { entries: [{ at, source, text }] } from the browser
 POST   /api/questions/:id             { answers: { "<question>": "label" | ["a","b"] } } or { dismiss: true }

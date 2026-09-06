@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { DockviewApi } from "dockview";
 import { PANELS, buildDefaultLayout, deleteNamedLayout, loadNamedLayout, namedLayouts, newTerminal, saveNamedLayout, showPanel } from "./layout.js";
 import { api as rest } from "./api.js";
@@ -16,25 +16,31 @@ function Check({ on }: { on: boolean }) {
   );
 }
 
-/** A flyout inside a menu: opens on hover or click, to the right; keeps the parent menu short. */
+/**
+ * A flyout inside a menu. Only one flyout is open per menu (the parent
+ * holds which), so moving the pointer from one row to the next switches
+ * instantly instead of waiting for the previous flyout's close timer.
+ */
+const SubMenuCtx = createContext<{ open: string | null; setOpen: (k: string | null) => void }>({ open: null, setOpen: () => {} });
+
 function SubMenu({ label, hint, children }: { label: string; hint?: React.ReactNode; children: React.ReactNode }) {
-  const [open, setOpen] = useState(false);
-  const timer = useRef<number | null>(null);
-  const show = () => { if (timer.current) window.clearTimeout(timer.current); setOpen(true); };
-  const hide = () => { timer.current = window.setTimeout(() => setOpen(false), 160); };
+  const { open, setOpen } = useContext(SubMenuCtx);
+  const isOpen = open === label;
   return (
-    <div className={`submenu${open ? " open" : ""}`} onMouseEnter={show} onMouseLeave={hide}>
-      <button type="button" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+    <div className={`submenu${isOpen ? " open" : ""}`} onMouseEnter={() => setOpen(label)}>
+      <button type="button" aria-haspopup="menu" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : label)}>
         <span>{label}</span>
         <span className="kbd">{hint}<span className="chev">›</span></span>
       </button>
-      {open && <div className="menu-list sub" role="menu">{children}</div>}
+      {isOpen && <div className="menu-list sub" role="menu">{children}</div>}
     </div>
   );
 }
 
 function Menu({ label, children }: { label: string; children: (close: () => void) => React.ReactNode }) {
   const [open, setOpen] = useState(false);
+  const [sub, setSub] = useState<string | null>(null);
+  const subCtx = useMemo(() => ({ open: sub, setOpen: setSub }), [sub]);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
@@ -51,8 +57,12 @@ function Menu({ label, children }: { label: string; children: (close: () => void
   }, [open]);
   return (
     <div className={`menu${open ? " open" : ""}`} ref={ref}>
-      <button onClick={() => setOpen((o) => !o)}>{label}</button>
-      {open && <div className="menu-list">{children(() => setOpen(false))}</div>}
+      <button onClick={() => { setOpen((o) => !o); setSub(null); }}>{label}</button>
+      {open && (
+        <SubMenuCtx.Provider value={subCtx}>
+          <div className="menu-list" onMouseLeave={() => setSub(null)}>{children(() => { setOpen(false); setSub(null); })}</div>
+        </SubMenuCtx.Provider>
+      )}
     </div>
   );
 }
@@ -105,8 +115,12 @@ export function Menubar({ api }: { api: DockviewApi | null }) {
             <button disabled={!active} onClick={() => { active && rest.end(active.id).catch((e) => store.toast(e.message)); close(); }}>End session (finish turn, exit)</button>
             <button disabled={!active} onClick={() => { if (active && confirm("Force-close this session? Pending approvals are denied.")) rest.remove(active.id).catch((e) => store.toast(e.message)); close(); }}>Close session</button>
             <hr />
-            <button disabled title="Snapshots come with the artifact panels">Save snapshot…</button>
-            <button disabled title="Export comes with the artifact panels">Export…</button>
+            <button disabled={!active} title="Write a Markdown record of this session (conversation, state, verification, submission) into the artifact home under snapshots/" onClick={() => { if (active) rest.snapshot(active.id).then((r) => store.toast(`Snapshot saved: ${r.path}`)).catch((e) => store.toast(e.message)); close(); }}>
+              Save snapshot <span className="kbd">to artifact home</span>
+            </button>
+            <button disabled={!active} title="Download the same record as a .md file" onClick={() => { if (active) { diag("export snapshot"); window.open(`/api/sessions/${active.id}/snapshot.md`, "_blank"); } close(); }}>
+              Export session… <span className="kbd">.md download</span>
+            </button>
           </>
         )}
       </Menu>

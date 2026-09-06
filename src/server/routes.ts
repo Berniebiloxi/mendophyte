@@ -33,6 +33,8 @@ import {
   type VerificationCheck,
 } from "../orchestrator/index.js";
 import { NotFoundError, ValidationError, defaultArtifactHome, type SessionManager } from "./session-manager.js";
+import { buildSnapshot, writeSnapshot } from "./snapshot.js";
+import { mkdir, realpath, rename, rm } from "node:fs/promises";
 import { TerminalError, hostInfo, ptyLoadError, type TerminalManager } from "./terminals.js";
 
 /**
@@ -68,6 +70,68 @@ export function apiRoutes(manager: SessionManager, terminals: TerminalManager): 
       res.json({ projects });
     })
   );
+
+  // Managing artifact homes: rename and delete stay inside ~/.mendophyte; move may go anywhere
+  // the user names. A home that a live session is using cannot be touched.
+  const projectsRoot = () => path.join(os.homedir(), ".mendophyte");
+  const safeName = (n: unknown): string => {
+    const s = String(n ?? "").trim();
+    if (!s || s === "." || s === ".." || /[\\/]/.test(s) || s === "logs") throw new ValidationError("project name must be a single folder name (not 'logs')");
+    return s;
+  };
+  const inUse = (home: string) => manager.list().some((s) => s.artifactHome === home && s.status !== "ended" && s.status !== "error");
+  r.post(
+    "/projects/:name/rename",
+    wrap(async (req, res) => {
+      const from = path.join(projectsRoot(), safeName(req.params.name));
+      const to = path.join(projectsRoot(), safeName(req.body?.to));
+      if (inUse(from)) throw new ValidationError("a running session is using this artifact home; end it first");
+      if (await stat(to).catch(() => null)) throw new ValidationError("a project with that name already exists");
+      await rename(from, to);
+      res.json({ ok: true, artifactHome: to });
+    })
+  );
+  r.post(
+    "/projects/:name/move",
+    wrap(async (req, res) => {
+      const from = path.join(projectsRoot(), safeName(req.params.name));
+      const to = path.resolve(String(req.body?.to ?? "").trim());
+      if (!to || to === path.resolve(os.homedir()) || to === "/" ) throw new ValidationError("destination must be a folder path that does not exist yet");
+      if (inUse(from)) throw new ValidationError("a running session is using this artifact home; end it first");
+      if (await stat(to).catch(() => null)) throw new ValidationError("destination already exists");
+      await mkdir(path.dirname(to), { recursive: true });
+      await rename(from, to);
+      res.json({ ok: true, artifactHome: to });
+    })
+  );
+  r.delete(
+    "/projects/:name",
+    wrap(async (req, res) => {
+      const target = path.join(projectsRoot(), safeName(req.params.name));
+      const real = await realpath(target).catch(() => null);
+      const rootReal = await realpath(projectsRoot()).catch(() => null);
+      if (!real || !rootReal || !real.startsWith(rootReal + path.sep)) throw new NotFoundError("no such project");
+      if (inUse(target)) throw new ValidationError("a running session is using this artifact home; end it first");
+      await rm(real, { recursive: true, force: true });
+      res.json({ ok: true });
+    })
+  );
+
+  // ---- session snapshot: a Markdown record written to the artifact home, or downloaded
+  r.post(
+    "/sessions/:id/snapshot",
+    wrap(async (req, res) => {
+      manager.mustGet(req.params.id);
+      res.json(await writeSnapshot(manager, req.params.id));
+    })
+  );
+  r.get("/sessions/:id/snapshot.md", (req, res) => {
+    manager.mustGet(req.params.id);
+    const { name, markdown } = buildSnapshot(manager, req.params.id);
+    res.setHeader("content-type", "text/markdown; charset=utf-8");
+    res.setHeader("content-disposition", `attachment; filename="${name}"`);
+    res.send(markdown);
+  });
 
   r.get(
     "/sessions/:id/artifacts",

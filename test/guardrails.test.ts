@@ -115,3 +115,10 @@ test("guardrail: forge writes beyond PR creation need confirmation; reads stay f
   assert.equal(id("glab issue list"), null);
   assert.equal(id("glab mr view 3"), null);
 });
+
+test("guardrail: git stash push is local, not a push", () => {
+  assert.equal(id("git stash push -- src/filters.ts"), null);
+  assert.equal(id("export PATH=x && git stash push -m wip >/dev/null && git stash pop"), null);
+  assert.equal(id("git stash && git push"), "git-push");
+  assert.equal(id("git push --force"), "git-force-push");
+});

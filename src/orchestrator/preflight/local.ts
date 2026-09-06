@@ -30,6 +30,8 @@ export interface GitState {
   dirtyFiles: number | null;
   remotes: { name: string; url: string }[];
   gitVersion: string | null;
+  /** What `git commit` would sign as, from repo or global config; null parts mean the commit would fail. */
+  identity: { name: string | null; email: string | null };
 }
 
 export interface ScaleReport {
@@ -78,8 +80,9 @@ export async function readGitState(repoDir: string): Promise<GitState> {
   const gitVersion = version.ok ? version.stdout.trim().replace(/^git version\s*/, "") : null;
 
   const top = await g("rev-parse", "--show-toplevel");
+  const [idName, idEmail] = await Promise.all([g("config", "--get", "user.name"), g("config", "--get", "user.email")]);
   if (!top.ok) {
-    return { isRepo: false, topLevel: null, branch: null, head: null, upstream: null, ahead: null, behind: null, dirtyFiles: null, remotes: [], gitVersion };
+    return { isRepo: false, topLevel: null, branch: null, head: null, upstream: null, ahead: null, behind: null, dirtyFiles: null, remotes: [], gitVersion, identity: { name: null, email: null } };
   }
 
   const [branch, head, upstream, status, remotes] = await Promise.all([
@@ -120,6 +123,7 @@ export async function readGitState(repoDir: string): Promise<GitState> {
     dirtyFiles: status.ok ? status.stdout.split(/\r?\n/).filter((l) => l.trim()).length : null,
     remotes: remoteList,
     gitVersion,
+    identity: { name: idName.ok && idName.stdout.trim() ? idName.stdout.trim() : null, email: idEmail.ok && idEmail.stdout.trim() ? idEmail.stdout.trim() : null },
   };
 }
 

@@ -113,6 +113,8 @@ export function formatPreflightFacts(r: PreflightReport): string {
   else {
     L.push(`- OBSERVED (git): branch ${g.branch ?? "unknown"} at ${g.head ?? "?"}; upstream ${g.upstream ?? "none"}${g.ahead !== null ? `; ahead ${g.ahead}, behind ${g.behind}` : ""}; ${g.dirtyFiles === null ? "dirty state unknown" : g.dirtyFiles === 0 ? "working tree clean" : `${g.dirtyFiles} modified/untracked path(s)`}`);
     if (g.remotes.length) L.push(`- OBSERVED remotes: ${g.remotes.map((x) => `${x.name} = ${x.url}`).join("; ")}`);
+    if (g.identity.name && g.identity.email) L.push(`- OBSERVED git identity: ${g.identity.name} <${g.identity.email}> (commits will be signed as this)`);
+    else L.push(`- OBSERVED: no git identity configured${g.identity.name ? " (email missing)" : g.identity.email ? " (name missing)" : ""}; \`git commit\` will fail until user.name and user.email are set. Ask me what to use before the first commit rather than guessing.`);
   }
   L.push("");
 

@@ -44,15 +44,16 @@ export const DEFAULT_GUARDRAIL_RULES: GuardrailRule[] = [
     description: "Force-push (rewrites the remote branch)",
     severity: "critical",
     test: (c) =>
-      re(`\\bgit\\b${SEG}\\bpush${W}${SEG}(--force(-with-lease|-if-includes)?\\b|\\s-[a-zA-Z]*f[a-zA-Z]*\\b)`).test(c) ||
+      re(`\\bgit\\b(?:(?!\\bstash\\b)[^|;&\\n])*\\bpush${W}${SEG}(--force(-with-lease|-if-includes)?\\b|\\s-[a-zA-Z]*f[a-zA-Z]*\\b)`).test(c) ||
       // `git push origin +branch` is also a force push.
-      re(`\\bgit\\b${SEG}\\bpush${W}${SEG}\\s\\+\\S+`).test(c),
+      re(`\\bgit\\b(?:(?!\\bstash\\b)[^|;&\\n])*\\bpush${W}${SEG}\\s\\+\\S+`).test(c),
   },
   {
     id: "git-push",
     description: "Push to a remote",
     severity: "confirm",
-    test: (c) => re(`\\bgit\\b${SEG}\\bpush${W}`).test(c),
+    // `git stash push` is local; the negative lookahead keeps "stash" out of the stretch before "push"
+    test: (c) => re(`\\bgit\\b(?:(?!\\bstash\\b)[^|;&\\n])*\\bpush${W}`).test(c),
   },
   {
     id: "git-history-rewrite",

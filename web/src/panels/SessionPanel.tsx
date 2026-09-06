@@ -14,9 +14,34 @@ export function SessionPanel() {
   const [error, setError] = useState<string | null>(null);
   const [projects, setProjects] = useState<{ name: string; artifactHome: string; modified: string }[]>([]);
 
+  const loadProjects = () => api.projects().then((p) => setProjects(p.projects)).catch(() => setProjects([]));
   useEffect(() => {
-    api.projects().then((p) => setProjects(p.projects)).catch(() => setProjects([]));
+    void loadProjects();
   }, [sessions.length]);
+
+  const act = async (label: string, fn: () => Promise<unknown>) => {
+    try {
+      await fn();
+      store.toast(label);
+      await loadProjects();
+    } catch (e) {
+      store.toast(e instanceof Error ? e.message : String(e));
+    }
+  };
+  const renameProject = (name: string) => {
+    const to = prompt(`Rename "${name}" to:`, name)?.trim();
+    if (!to || to === name) return;
+    void act(`Renamed to ${to}`, () => api.renameProject(name, to));
+  };
+  const moveProject = (name: string, from: string) => {
+    const to = prompt(`Move the artifact folder for "${name}" to (full path of a new folder):`, from)?.trim();
+    if (!to || to === from) return;
+    void act(`Moved to ${to}`, () => api.moveProject(name, to));
+  };
+  const deleteProject = (name: string) => {
+    if (!confirm(`Delete the artifact folder for "${name}" and everything in it (notes A–F, feedback log, benchmarks, snapshots)? This cannot be undone.`)) return;
+    void act(`Deleted ${name}`, () => api.deleteProject(name));
+  };
 
   const create = async () => {
     setBusy(true);
@@ -95,13 +120,29 @@ export function SessionPanel() {
       {projects.length > 0 && (
         <>
           <h3>Prior projects (artifact homes)</h3>
-          {projects.map((p) => (
-            <div key={p.artifactHome} className="row" style={{ fontSize: 12 }}>
-              <span className="grow">{p.name}</span>
-              <span className="faint">{new Date(p.modified).toLocaleDateString()}</span>
-              <span className="faint mono" title={p.artifactHome}>artifacts</span>
-            </div>
-          ))}
+          <div className="faint" style={{ marginBottom: 4 }}>Each folder holds one repository's notes A–F, feedback log, benchmarks and snapshots. Starting a session on the same repository reuses it.</div>
+          <div className="proj-list">
+            {projects.map((p) => {
+              const live = sessions.some((s) => s.artifactHome === p.artifactHome && s.status !== "ended" && s.status !== "error");
+              return (
+                <div key={p.artifactHome} className="proj-row" title={p.artifactHome}>
+                  <div className="grow" style={{ minWidth: 0 }}>
+                    <div className="row" style={{ gap: 6 }}>
+                      <b style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</b>
+                      {live && <span className="tag ok">in use</span>}
+                    </div>
+                    <div className="faint mono" style={{ fontSize: "0.7rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.artifactHome}</div>
+                  </div>
+                  <span className="faint" style={{ whiteSpace: "nowrap" }}>{new Date(p.modified).toLocaleDateString()}</span>
+                  <div className="row" style={{ gap: 4, flexWrap: "nowrap" }}>
+                    <button className="btn sm" disabled={live} onClick={() => renameProject(p.name)} title="Rename the folder (stays under ~/.mendophyte)">Rename</button>
+                    <button className="btn sm" disabled={live} onClick={() => moveProject(p.name, p.artifactHome)} title="Move the folder somewhere else on this machine">Move</button>
+                    <button className="btn sm" disabled={live} onClick={() => deleteProject(p.name)} title="Delete the folder and everything in it">Delete</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </>
       )}
     </div>

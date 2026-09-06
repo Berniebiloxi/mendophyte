@@ -79,15 +79,15 @@ export function ArtifactsPanel() {
           return (
             <div key={e.name} className={`art-item${e.name === selected ? " sel" : ""}`} onClick={() => setSelected(e.name)} title={`${e.bytes} bytes · ${new Date(e.modified).toLocaleString()}`}>
               {L && <span className="tag bloom">{L}</span>}
-              <span className="grow" style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{L && LETTERS[L] ? LETTERS[L] : e.name}</span>
+              <span className="grow art-name">{L && LETTERS[L] ? LETTERS[L] : e.name}</span>
             </div>
           );
         })}
       </div>
       <div className="art-main">
-        <div className="row" style={{ padding: "6px 10px", borderBottom: "1px solid var(--m-border)", background: "var(--m-bg-2)" }}>
-          <span className="mono faint grow" style={{ fontSize: 11 }}>{selected ?? ""}{file ? ` · ${new Date(file.modified).toLocaleTimeString()}` : ""}</span>
-          <input type="text" value={find} onChange={(e) => setFind(e.target.value)} placeholder="find in this artifact" style={{ width: 180 }} />
+        <div className="art-head">
+          <span className="mono faint art-title" title={selected ?? ""}>{selected ?? ""}{file ? ` · ${new Date(file.modified).toLocaleTimeString()}` : ""}</span>
+          <input type="text" value={find} onChange={(e) => setFind(e.target.value)} placeholder="find in this artifact" />
         </div>
         {!file && selected && <div className="empty" style={{ padding: 12 }}>Loading…</div>}
         {file && <div className="md" dangerouslySetInnerHTML={{ __html: html }} />}

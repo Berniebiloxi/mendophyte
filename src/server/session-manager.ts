@@ -75,6 +75,14 @@ export interface SessionSummary {
   busy: boolean;
   /** Wall-clock and API time of the last completed turn, for the latency readout. */
   lastTurn: TurnTiming | null;
+  /**
+   * The phase the agent is working in right now, inferred from it reading
+   * prompts/0N-*.md. The structured state only arrives when a turn ends, and
+   * one turn can run through several phases when the agent asks questions
+   * with AskUserQuestion (which keeps the turn open), so the tree would
+   * otherwise sit at "waiting" for many minutes.
+   */
+  livePhase: number | null;
   lastError: string | null;
   preflight: PreflightSummary | null;
 }
@@ -186,6 +194,9 @@ interface Entry {
   submissionBusy: boolean;
   turnStartedAt: number | null;
   firstTextAt: number | null;
+  /** Claude Code's cumulative session totals as of the previous result, to derive per-turn numbers. */
+  prevApiMs: number;
+  prevDurationMs: number;
   draft: string;
   draftTimer: NodeJS.Timeout | null;
 }
@@ -391,6 +402,7 @@ export class SessionManager extends EventEmitter {
       pendingQuestions: 0,
       busy: false,
       lastTurn: null,
+      livePhase: null,
       lastError: null,
       preflight: report
         ? {
@@ -402,7 +414,7 @@ export class SessionManager extends EventEmitter {
           }
         : null,
     };
-    const entry: Entry = { summary, session, broker, questions, turnStartedAt: null, firstTextAt: null, draft: "", draftTimer: null, events: [], seq: 0, preflightFacts: facts, report, fragility: null, verificationDetected: null, verificationRuns: [], watcher: null, watchTimer: null, submission: null, submissionTimer: null, submissionIntervalSec: null, submissionBusy: false };
+    const entry: Entry = { summary, session, broker, questions, turnStartedAt: null, firstTextAt: null, prevApiMs: 0, prevDurationMs: 0, draft: "", draftTimer: null, events: [], seq: 0, preflightFacts: facts, report, fragility: null, verificationDetected: null, verificationRuns: [], watcher: null, watchTimer: null, submission: null, submissionTimer: null, submissionIntervalSec: null, submissionBusy: false };
     this.entries.set(id, entry);
     this.wire(entry);
     this.watchArtifacts(entry);
@@ -507,7 +519,7 @@ export class SessionManager extends EventEmitter {
     this.record(entry, "artifacts", payload);
   }
 
-  private mustGet(id: string): Entry {
+  mustGet(id: string): Entry {
     const e = this.entries.get(id);
     if (!e) throw new NotFoundError(`No session ${id}`);
     return e;
@@ -554,10 +566,24 @@ export class SessionManager extends EventEmitter {
         updated();
       }
     });
-    session.on("tool_use", (t: { name: string; input: unknown; id: string }) => this.record(entry, "tool_use", t));
+    session.on("tool_use", (t: { name: string; input: unknown; id: string }) => {
+      this.record(entry, "tool_use", t);
+      if (t.name === "Read") {
+        const p = String((t.input as { file_path?: string })?.file_path ?? "").replace(/\\/g, "/");
+        const m = /\/0([0-5])-(entry|recon|orientation|triage|fix|submission)\.md$/.exec(p);
+        if (m) {
+          const ph = Number(m[1]);
+          if (summary.livePhase === null || ph > summary.livePhase) {
+            summary.livePhase = ph;
+            updated();
+          }
+        }
+      }
+    });
     session.on("tool_allowed", (t: { toolName: string; input: Record<string, unknown> }) => this.record(entry, "tool_allowed", t));
     session.on("state", (s: SessionState) => {
       summary.lastState = s;
+      if (summary.livePhase === null || s.phase > summary.livePhase) summary.livePhase = s.phase;
       if (s.triage) summary.lastTriage = s.triage;
       this.record(entry, "state", s);
       updated();
@@ -565,10 +591,17 @@ export class SessionManager extends EventEmitter {
     session.on("turn", ({ result, state, stateError }: TurnEvent) => {
       const r = result as Record<string, unknown>;
       const now = Date.now();
+      // Claude Code's duration_api_ms / duration_ms are cumulative for the whole session
+      // (verified from a real log: 636s, 668s, 742s… across consecutive turns), so per-turn
+      // API time is the difference from the previous result.
+      const cumApi = typeof r.duration_api_ms === "number" ? r.duration_api_ms : null;
+      const apiMs = cumApi === null ? null : Math.max(0, cumApi - entry.prevApiMs);
+      if (cumApi !== null) entry.prevApiMs = cumApi;
+      if (typeof r.duration_ms === "number") entry.prevDurationMs = r.duration_ms;
       const timing: TurnTiming | null = entry.turnStartedAt
         ? {
             wallMs: now - entry.turnStartedAt,
-            apiMs: typeof r.duration_api_ms === "number" ? r.duration_api_ms : null,
+            apiMs,
             firstTextMs: entry.firstTextAt ? entry.firstTextAt - entry.turnStartedAt : null,
             numTurns: typeof result.num_turns === "number" ? result.num_turns : null,
             costUsd: typeof r.total_cost_usd === "number" ? r.total_cost_usd : null,

@@ -40,8 +40,13 @@ export function SpinePanel() {
   const s = useActiveSession();
   const verification = useUi((st) => st.verification);
   const [buds, setBuds] = useState<Set<string>>(new Set());
-  const phase = s?.lastState?.phase ?? null;
-  const complete = s?.lastState?.phase_complete ?? false;
+  // The structured state is per turn; livePhase moves as soon as the agent opens the next
+  // phase's prompt, so the tree reacts mid-turn (a turn can span several phases).
+  const statePhase = s?.lastState?.phase ?? null;
+  const live = s?.livePhase ?? null;
+  const phase = live !== null && (statePhase === null || live > statePhase) ? live : statePhase;
+  const complete = phase === statePhase ? (s?.lastState?.phase_complete ?? false) : false;
+  const working = !!s?.busy && s.status === "running";
   const turns = useEventCount(s?.id, "turn");
   const lastArtifacts = useLastEvent(s?.id, "artifacts");
 
@@ -82,6 +87,13 @@ export function SpinePanel() {
     return `M ${x(i - 1)} ${y(i - 1)} Q ${cx} ${cy} ${x(i)} ${y(i)}`;
   };
   const flowing = phase !== null && !complete && phase > 0 ? phase : complete && phase !== null && phase < 5 ? phase + 1 : null;
+  // Label widths, so bud connectors start after the text instead of running through it.
+  const labelW = (t: string) => {
+    const c = document.createElement("canvas").getContext("2d");
+    if (!c) return t.length * 6.4;
+    c.font = `12px ${getComputedStyle(document.documentElement).getPropertyValue("--m-font-serif") || "serif"}`;
+    return c.measureText(t).width;
+  };
 
   return (
     <div className="panel spine">
@@ -90,15 +102,17 @@ export function SpinePanel() {
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={s ? `Phase ${phase ?? "not started"}` : "no session"}>
         <path className="vine-path" d={d} />
         <path className="vine-grown" d={d} pathLength={total} strokeDasharray={`${grownFrac * total} ${total}`} />
-        {flowing !== null && s?.status === "running" && (
+        {(flowing !== null || (working && phase === null)) && s?.status === "running" && (
           <>
-            <path className="vine-flow-glow" d={seg(flowing)} pathLength={100} />
-            <path className="vine-flow" d={seg(flowing)} pathLength={100} />
+            <path className="vine-flow-glow" d={seg(flowing ?? 1)} pathLength={100} />
+            <path className="vine-flow" d={seg(flowing ?? 1)} pathLength={100} />
           </>
         )}
         {PHASES.map((p, i) => {
           const done = phase !== null && (p.n < phase || (p.n === phase && complete));
-          const now = phase === p.n && !complete;
+          const now = (phase === p.n && !complete) || (phase === null && working && p.n === 0);
+          const label = `${p.n} · ${p.name}`;
+          const labelEnd = x(i) + 16 + labelW(label) + 8;
           const cls = done ? "node done" : now ? "node now" : "node";
           return (
             <g key={p.n}>
@@ -109,7 +123,7 @@ export function SpinePanel() {
               <path className={`leaf${done || now ? "" : " dormant"}`} d={`M ${x(i) - 6} ${y(i) - 10} q -14 -14 -4 -26 q 12 6 4 26 z`} />
               <circle className={cls} cx={x(i)} cy={y(i)} r={7} />
               <text className={`label${done || now ? "" : " dim"}`} x={x(i) + 16} y={y(i) + 4}>
-                {p.n} · {p.name}
+                {label}
               </text>
               {p.n === 4 && lastRun && (
                 <g transform={`translate(${x(i) - 30} ${y(i) - 6})`}>
@@ -121,12 +135,12 @@ export function SpinePanel() {
                 </g>
               )}
               {p.buds.map((b, k) => {
-                const bx = x(i) + 120 + k * 22;
+                const bx = Math.max(labelEnd + 14, x(i) + 120) + k * 22;
                 const by = y(i) - 2;
                 const open = buds.has(b);
                 return (
                   <g key={b}>
-                    <line x1={x(i) + 8} y1={y(i)} x2={bx - 6} y2={by} stroke="var(--m-vine-dormant)" strokeWidth={1} strokeDasharray={open ? undefined : "2 3"} />
+                    <line x1={k === 0 ? labelEnd : bx - 22 + 5} y1={k === 0 ? y(i) : by} x2={bx - 6} y2={by} stroke="var(--m-vine-dormant)" strokeWidth={1} strokeDasharray={open ? undefined : "2 3"} />
                     <circle className={`bud${open ? " open" : ""}`} cx={bx} cy={by} r={4.5}>
                       <title>
                         Artifact {b} · {ARTIFACT_NAMES[b]} {open ? "(present)" : "(not yet)"}

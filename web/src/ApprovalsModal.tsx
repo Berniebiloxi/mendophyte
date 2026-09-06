@@ -26,16 +26,19 @@ export function ApprovalsModal() {
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="approval-title">
       <div className="modal" style={critical ? undefined : { borderTopColor: "var(--m-warn)" }}>
-        <div className="row" style={{ justifyContent: "space-between" }}>
+        <div className="row modal-head" style={{ justifyContent: "space-between" }}>
           <h2 id="approval-title">{a.match.description}</h2>
           <span className={`tag ${critical ? "bad" : "warn"}`}>{critical ? "irreversible" : "needs your go-ahead"}</span>
         </div>
+        <div className="modal-body">
         <div className="muted">
           The agent wants to run this in <code>{a.cwd}</code>
           {session ? <> for <b>{session.repoDir.split(/[\\/]/).pop()}</b></> : null}. Standing guardrail: <code>{a.match.ruleId}</code>.
           {approvals.length > 1 && <> {approvals.length - 1} more waiting.</>}
         </div>
         <div className="cmd">{a.command}</div>
+        </div>
+        <div className="modal-foot">
         <label className="field">
           If declining, tell the agent why (optional)
           <input type="text" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. not until the test is written" />
@@ -47,6 +50,7 @@ export function ApprovalsModal() {
           <button className={`btn ${critical ? "danger" : "primary"}`} onClick={() => store.resolveApproval(a.id, true)}>
             Run this exact command
           </button>
+        </div>
         </div>
       </div>
     </div>

@@ -28,3 +28,13 @@ test("childEnv: strips npm lifecycle variables and the Claude Code nesting guard
     Object.assign(process.env, saved);
   }
 });
+
+test("childEnv: appends existing user tool dirs to PATH once, never duplicates", async () => {
+  const { userToolDirs } = await import("../src/orchestrator/env.js");
+  const env = childEnv();
+  const pathKey = Object.keys(env).find((k) => k.toUpperCase() === "PATH")!;
+  const parts = env[pathKey].split(process.platform === "win32" ? ";" : ":");
+  for (const d of userToolDirs()) assert.equal(parts.filter((p) => p === d).length, 1, `${d} appears exactly once`);
+  const again = childEnv({ [pathKey]: env[pathKey] });
+  assert.equal(again[pathKey], env[pathKey], "already-augmented PATH is left alone");
+});

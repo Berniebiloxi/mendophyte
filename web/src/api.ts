@@ -22,6 +22,10 @@ export interface CreateSessionBody {
 export const api = {
   setDiagEnabled: (enabled: boolean) => call<{ enabled: boolean }>("POST", "/diag/enabled", { enabled }),
   diag: (tail = 300) => call<{ path: string; size: number; enabled: boolean; tail: string }>("GET", `/diag?tail=${tail}`),
+  snapshot: (id: string) => call<{ path: string; name: string; bytes: number }>("POST", `/sessions/${id}/snapshot`, {}),
+  renameProject: (name: string, to: string) => call<{ ok: true; artifactHome: string }>("POST", `/projects/${encodeURIComponent(name)}/rename`, { to }),
+  moveProject: (name: string, to: string) => call<{ ok: true; artifactHome: string }>("POST", `/projects/${encodeURIComponent(name)}/move`, { to }),
+  deleteProject: (name: string) => call<{ ok: true }>("DELETE", `/projects/${encodeURIComponent(name)}`),
   health: () => call<{ status: string; sessions: number; pendingApprovals: number }>("GET", "/health"),
   projects: () => call<{ projects: { name: string; artifactHome: string; modified: string }[] }>("GET", "/projects"),
   sessions: () => call<{ sessions: SessionSummary[] }>("GET", "/sessions"),
