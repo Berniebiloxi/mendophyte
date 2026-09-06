@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { askConfirm, askPrompt } from "../ask.js";
 import { api } from "../api.js";
 import { store } from "../store.js";
 import { diag } from "../diag.js";
@@ -26,7 +27,7 @@ export function OpenProjectDialog({ onClose, onOther }: { onClose: () => void; o
   }, []);
   const locate = async (p: Project) => {
     const guess = p.repoDir ?? "";
-    const dir = prompt(`Where is the clone for "${p.name}"? Full path of the repository folder on this machine:`, guess)?.trim();
+    const dir = askPrompt(`Where is the clone for "${p.name}"? Full path of the repository folder on this machine:`, guess)?.trim();
     if (!dir) return;
     setErr(null);
     try {

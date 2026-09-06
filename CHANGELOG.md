@@ -5,6 +5,19 @@ batch of user-visible changes, the patch number with fixes only. The
 number lives in package.json and is read from there everywhere
 (health endpoint, SDK client string, MCP server, About box).
 
+## 0.4.0 — 2026-09-07
+
+- Session panel: prior projects sit above the new-session form, which
+  collapses once a session exists, so the list is not buried.
+- Turn timing splits out time spent waiting on the user (question cards,
+  confirmations) so wall-clock is not mistaken for agent slowness.
+- Native confirm/prompt dialogs are logged with their duration; the
+  "main thread blocked" lines they cause now have an explanation next
+  to them. End session is disabled once a session has ended and gives
+  feedback; a terminal closed by the server no longer tries to
+  reconnect. The SDK's pre-approved-tools warning is logged as an
+  expected note, not an error.
+
 ## 0.3.0 — 2026-09-07
 
 - The agent's replies are rendered as Markdown in the conversation: each

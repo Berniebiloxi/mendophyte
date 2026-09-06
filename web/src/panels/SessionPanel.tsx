@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { askConfirm, askPrompt } from "../ask.js";
 import { api } from "../api.js";
 import { store, useUi } from "../store.js";
 
@@ -29,17 +30,17 @@ export function SessionPanel() {
     }
   };
   const renameProject = (name: string) => {
-    const to = prompt(`Rename "${name}" to:`, name)?.trim();
+    const to = askPrompt(`Rename "${name}" to:`, name)?.trim();
     if (!to || to === name) return;
     void act(`Renamed to ${to}`, () => api.renameProject(name, to));
   };
   const moveProject = (name: string, from: string) => {
-    const to = prompt(`Move the artifact folder for "${name}" to (full path of a new folder):`, from)?.trim();
+    const to = askPrompt(`Move the artifact folder for "${name}" to (full path of a new folder):`, from)?.trim();
     if (!to || to === from) return;
     void act(`Moved to ${to}`, () => api.moveProject(name, to));
   };
   const deleteProject = (name: string) => {
-    if (!confirm(`Delete the artifact folder for "${name}" and everything in it (notes A–F, feedback log, benchmarks, snapshots)? This cannot be undone.`)) return;
+    if (!askConfirm(`Delete the artifact folder for "${name}" and everything in it (notes A–F, feedback log, benchmarks, snapshots)? This cannot be undone.`)) return;
     void act(`Deleted ${name}`, () => api.deleteProject(name));
   };
 
@@ -76,13 +77,42 @@ export function SessionPanel() {
           <div className="row" style={{ marginTop: 8 }}>
             {s.id !== activeSessionId && <button className="btn sm" onClick={() => store.setActive(s.id)}>Make active</button>}
             {s.status === "running" && <button className="btn sm" onClick={() => api.end(s.id).catch((e) => store.toast(e.message))}>End</button>}
-            <button className="btn sm" onClick={() => confirm("Force-close and forget this session?") && api.remove(s.id).catch((e) => store.toast(e.message))}>Close</button>
+            <button className="btn sm" onClick={() => askConfirm("Force-close and forget this session?") && api.remove(s.id).catch((e) => store.toast(e.message))}>Close</button>
           </div>
           {s.lastError && <div className="tag bad" style={{ marginTop: 6, whiteSpace: "normal", lineHeight: 1.4, padding: "6px 10px" }}>{s.lastError}</div>}
         </div>
       ))}
 
-      <h3>New session</h3>
+      {projects.length > 0 && (
+        <>
+          <h3>Prior projects (artifact homes)</h3>
+          <div className="faint" style={{ marginBottom: 4 }}>Each folder holds one repository's notes A–F, feedback log, benchmarks and snapshots. Starting a session on the same repository reuses it.</div>
+          <div className="proj-list">
+            {projects.map((p) => {
+              const live = sessions.some((s) => s.artifactHome === p.artifactHome && s.status !== "ended" && s.status !== "error");
+              return (
+                <div key={p.artifactHome} className="proj-row" title={p.artifactHome}>
+                  <div className="grow" style={{ minWidth: 0 }}>
+                    <div className="row" style={{ gap: 6 }}>
+                      <b style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</b>
+                      {live && <span className="tag ok">in use</span>}
+                    </div>
+                    <div className="faint mono" style={{ fontSize: "0.7rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.artifactHome}</div>
+                  </div>
+                  <span className="faint" style={{ whiteSpace: "nowrap" }}>{new Date(p.modified).toLocaleDateString()}</span>
+                  <div className="row" style={{ gap: 4, flexWrap: "nowrap" }}>
+                    <button className="btn sm" disabled={live} onClick={() => renameProject(p.name)} title="Rename the folder (stays under ~/.mendophyte)">Rename</button>
+                    <button className="btn sm" disabled={live} onClick={() => moveProject(p.name, p.artifactHome)} title="Move the folder somewhere else on this machine">Move</button>
+                    <button className="btn sm" disabled={live} onClick={() => deleteProject(p.name)} title="Delete the folder and everything in it">Delete</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+      <details className="sess-form" open={sessions.length === 0}>
+        <summary><h3 style={{ display: "inline", margin: 0 }}>New session</h3> <span className="faint">point Mendophyte at a clone</span></summary>
       <label className="field">
         Repository clone (absolute path on this machine)
         <input type="text" value={repoDir} onChange={(e) => setRepoDir(e.target.value)} placeholder="/home/me/src/some-project" list="projects" />
@@ -117,34 +147,7 @@ export function SessionPanel() {
         <span className="faint">Pre-flight can take up to 20s when a forge probe times out.</span>
       </div>
 
-      {projects.length > 0 && (
-        <>
-          <h3>Prior projects (artifact homes)</h3>
-          <div className="faint" style={{ marginBottom: 4 }}>Each folder holds one repository's notes A–F, feedback log, benchmarks and snapshots. Starting a session on the same repository reuses it.</div>
-          <div className="proj-list">
-            {projects.map((p) => {
-              const live = sessions.some((s) => s.artifactHome === p.artifactHome && s.status !== "ended" && s.status !== "error");
-              return (
-                <div key={p.artifactHome} className="proj-row" title={p.artifactHome}>
-                  <div className="grow" style={{ minWidth: 0 }}>
-                    <div className="row" style={{ gap: 6 }}>
-                      <b style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</b>
-                      {live && <span className="tag ok">in use</span>}
-                    </div>
-                    <div className="faint mono" style={{ fontSize: "0.7rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.artifactHome}</div>
-                  </div>
-                  <span className="faint" style={{ whiteSpace: "nowrap" }}>{new Date(p.modified).toLocaleDateString()}</span>
-                  <div className="row" style={{ gap: 4, flexWrap: "nowrap" }}>
-                    <button className="btn sm" disabled={live} onClick={() => renameProject(p.name)} title="Rename the folder (stays under ~/.mendophyte)">Rename</button>
-                    <button className="btn sm" disabled={live} onClick={() => moveProject(p.name, p.artifactHome)} title="Move the folder somewhere else on this machine">Move</button>
-                    <button className="btn sm" disabled={live} onClick={() => deleteProject(p.name)} title="Delete the folder and everything in it">Delete</button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </>
-      )}
+      </details>
     </div>
   );
 }

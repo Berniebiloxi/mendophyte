@@ -948,3 +948,10 @@ pre.out, .md pre, .modal .cmd { border-radius: 0.625rem; box-shadow: var(--m-cla
 .msg.rich.sectioned > .prose { padding: 0.2rem 0.3rem 0; }
 /* inline formatting inside cards */
 .qc-title code, .prompt code, .qc-text code { background: var(--m-code-bg); padding: 0 0.25rem; border-radius: 0.2rem; font-size: 0.9em; }
+
+/* session panel: collapsible new-session form */
+.sess-form > summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: 0.5rem; padding: 0.35rem 0; }
+.sess-form > summary::-webkit-details-marker { display: none; }
+.sess-form > summary::before { content: "▸"; color: var(--m-ink-3); font-size: 0.8rem; }
+.sess-form[open] > summary::before { content: "▾"; }
+.sess-form > :not(summary) { margin-top: 0.5rem; }

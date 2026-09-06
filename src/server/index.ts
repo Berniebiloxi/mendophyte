@@ -61,7 +61,7 @@ export async function createMendophyteServer(opts: { port: number; host?: string
   // written; everything else is one line each.
   let rawMessages = 0;
   manager.on("session.created", (s) => diag.log("session", `created ${s.id} repo=${s.repoDir} model=${s.model ?? "default"} artifacts=${s.artifactHome}`));
-  manager.on("session.updated", (s) => diag.log("session", `${s.id} status=${s.status}${s.lastError ? ` error=${brief(s.lastError, 200)}` : ""} phase=${s.lastState?.phase ?? "-"} yourTurn=${s.lastState?.your_turn_items.length ?? 0} approvals=${s.pendingApprovals} questions=${s.pendingQuestions}`));
+  manager.on("session.updated", (s) => diag.log("session", `${s.id} status=${s.status}${s.lastError ? ` error=${brief(s.lastError, 200)}` : ""} phase=${s.lastState?.phase ?? "-"} live=${s.livePhase ?? "-"} busy=${s.busy} yourTurn=${s.lastState?.your_turn_items.length ?? 0} approvals=${s.pendingApprovals} questions=${s.pendingQuestions}`));
   manager.on("session.removed", (id) => diag.log("session", `removed ${id}`));
   manager.on("session.event", (e) => {
     if (e.event === "message") {
@@ -75,7 +75,7 @@ export async function createMendophyteServer(opts: { port: number; host?: string
       case "assistant_text": what = `agent: ${brief(d?.text, 300)}`; break;
       case "tool_use": what = `tool ${d?.name} ${brief(d?.input, 300)}`; break;
       case "tool_allowed": what = `allowed ${d?.toolName ?? d?.name ?? ""} ${brief(d?.command ?? d?.input, 200)}`; break;
-      case "turn": what = `turn ${d?.subtype} cost=${d?.total_cost_usd ?? "?"} turns=${d?.num_turns ?? "?"}${d?.timing ? ` latency: first text ${d.timing.firstTextMs ?? "?"}ms, result ${d.timing.wallMs}ms wall / ${d.timing.apiMs ?? "?"}ms api` : ""}${d?.stateError ? ` stateError=${brief(d.stateError, 200)}` : ""}`; break;
+      case "turn": what = `turn ${d?.subtype} cost=${d?.total_cost_usd ?? "?"} turns=${d?.num_turns ?? "?"}${d?.timing ? ` latency: first text ${d.timing.firstTextMs ?? "?"}ms, result ${d.timing.wallMs}ms wall (${d.timing.waitingOnUserMs ?? 0}ms of it waiting on the user) / ${d.timing.apiMs ?? "?"}ms api` : ""}${d?.stateError ? ` stateError=${brief(d.stateError, 200)}` : ""}`; break;
       case "user_text": what = `${d?.kickoff ? "kickoff" : "user"}: ${brief(d?.text, 200)}`; break;
       case "state": what = `state phase=${d?.phase} complete=${d?.phase_complete} yourTurn=${brief((d?.your_turn_items ?? []).map((i: any) => `${i.id}:${i.kind}:${i.blocks}`), 300)}`; break;
       case "error": what = `ERROR ${brief(d?.message ?? d, 400)}`; break;

@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { askConfirm, askPrompt } from "./ask.js";
 import type { DockviewApi } from "dockview";
 import { PANELS, PRESETS, applyPreset, loadNamedLayout, namedLayouts, newTerminal, showPanel } from "./layout.js";
 import { OpenProjectDialog } from "./dialogs/OpenProjectDialog.js";
@@ -136,8 +137,10 @@ export function Menubar({ api }: { api: DockviewApi | null }) {
             <button onClick={() => { api && showPanel(api, "session"); close(); }}>New session… <span className="kbd">Session panel</span></button>
             <button onClick={() => { setDialog("open"); close(); }}>Open project… <span className="kbd">a repo you worked on before</span></button>
             <hr />
-            <button disabled={!active} onClick={() => { active && rest.end(active.id).catch((e) => store.toast(e.message)); close(); }}>End session (finish turn, exit)</button>
-            <button disabled={!active} onClick={() => { if (active && confirm("Force-close this session? Pending approvals are denied.")) rest.remove(active.id).catch((e) => store.toast(e.message)); close(); }}>Close session</button>
+            <button disabled={!active || active.status !== "running"} title={active?.status === "ended" ? "Already ended" : "Let the agent finish its turn, then exit"} onClick={() => { if (active) rest.end(active.id).then(() => store.toast("Ending: the agent finishes its turn and exits.")).catch((e) => store.toast(e.message)); close(); }}>
+              End session <span className="kbd">{active ? active.status : "no session"}</span>
+            </button>
+            <button disabled={!active} onClick={() => { if (active && askConfirm("Force-close this session? Pending approvals are denied.")) rest.remove(active.id).catch((e) => store.toast(e.message)); close(); }}>Close session</button>
             <hr />
             <button disabled={!active} title="Write a Markdown record of this session (conversation, state, verification, submission) into the artifact home under snapshots/" onClick={() => { if (active) rest.snapshot(active.id).then((r) => store.toast(`Snapshot saved: ${r.path}`)).catch((e) => store.toast(e.message)); close(); }}>
               Save snapshot <span className="kbd">to artifact home</span>

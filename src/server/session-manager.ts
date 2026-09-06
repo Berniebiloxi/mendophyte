@@ -94,6 +94,8 @@ export interface TurnTiming {
   apiMs: number | null;
   /** From the message to the first streamed text. */
   firstTextMs: number | null;
+  /** Time inside the turn spent waiting on the user (question cards, confirmations). */
+  waitingOnUserMs: number;
   numTurns: number | null;
   costUsd: number | null;
 }
@@ -196,6 +198,9 @@ interface Entry {
   firstTextAt: number | null;
   /** Set when the user interrupts; the next result is then reported as "stopped by you". */
   interruptedAt: number | null;
+  /** Accumulated ms this turn spent blocked on the UI (pending questions/approvals). */
+  blockedMs: number;
+  blockedSince: Map<string, number>;
   /** Claude Code's cumulative session totals as of the previous result, to derive per-turn numbers. */
   prevApiMs: number;
   prevDurationMs: number;
@@ -421,7 +426,7 @@ export class SessionManager extends EventEmitter {
           }
         : null,
     };
-    const entry: Entry = { summary, session, broker, questions, turnStartedAt: null, firstTextAt: null, interruptedAt: null, prevApiMs: 0, prevDurationMs: 0, draft: "", draftTimer: null, events: [], seq: 0, preflightFacts: facts, report, fragility: null, verificationDetected: null, verificationRuns: [], watcher: null, watchTimer: null, submission: null, submissionTimer: null, submissionIntervalSec: null, submissionBusy: false };
+    const entry: Entry = { summary, session, broker, questions, turnStartedAt: null, firstTextAt: null, interruptedAt: null, blockedMs: 0, blockedSince: new Map(), prevApiMs: 0, prevDurationMs: 0, draft: "", draftTimer: null, events: [], seq: 0, preflightFacts: facts, report, fragility: null, verificationDetected: null, verificationRuns: [], watcher: null, watchTimer: null, submission: null, submissionTimer: null, submissionIntervalSec: null, submissionBusy: false };
     this.entries.set(id, entry);
     this.wire(entry);
     this.watchArtifacts(entry);
@@ -450,6 +455,8 @@ export class SessionManager extends EventEmitter {
   private startTurn(entry: Entry, text: string, kickoff: boolean): void {
     entry.turnStartedAt = Date.now();
     entry.firstTextAt = null;
+    entry.blockedMs = 0;
+    entry.blockedSince.clear();
     entry.summary.busy = true;
     this.record(entry, "user_text", { text, kickoff });
     this.emit("session.updated", entry.summary);
@@ -622,6 +629,7 @@ export class SessionManager extends EventEmitter {
             wallMs: now - entry.turnStartedAt,
             apiMs,
             firstTextMs: entry.firstTextAt ? entry.firstTextAt - entry.turnStartedAt : null,
+            waitingOnUserMs: entry.blockedMs,
             numTurns: typeof result.num_turns === "number" ? result.num_turns : null,
             costUsd: typeof r.total_cost_usd === "number" ? r.total_cost_usd : null,
           }
@@ -674,22 +682,34 @@ export class SessionManager extends EventEmitter {
       updated();
     });
 
+    const blockStart = (id: string) => entry.blockedSince.set(id, Date.now());
+    const blockEnd = (id: string) => {
+      const t = entry.blockedSince.get(id);
+      if (t !== undefined) {
+        entry.blockedMs += Date.now() - t;
+        entry.blockedSince.delete(id);
+      }
+    };
     broker.on("pending", (req) => {
+      blockStart(req.id);
       summary.pendingApprovals = broker.pending().length;
       this.emit("approval.pending", { ...req, sessionId: summary.id });
       updated();
     });
     broker.on("resolved", (req, decision) => {
+      blockEnd(req.id);
       summary.pendingApprovals = broker.pending().length;
       this.emit("approval.resolved", { ...req, sessionId: summary.id }, decision);
       updated();
     });
     questions.on("pending", (req: QuestionRequest) => {
+      blockStart(req.id);
       summary.pendingQuestions = questions.pending().length;
       this.emit("question.pending", { ...req, sessionId: summary.id });
       updated();
     });
     questions.on("resolved", (req: QuestionRequest, d: { answered: boolean }) => {
+      blockEnd(req.id);
       summary.pendingQuestions = questions.pending().length;
       this.emit("question.resolved", { ...req, sessionId: summary.id }, d.answered);
       updated();

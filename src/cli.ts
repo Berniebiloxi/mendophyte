@@ -85,7 +85,11 @@ program
       const orig = console[level].bind(console);
       console[level] = (...args: unknown[]) => {
         orig(...args);
-        diag.log(level === "error" ? "error" : "server", `[stdout] ${args.map((a) => (typeof a === "string" ? a : JSON.stringify(a))).join(" ")}`);
+        const text = args.map((a) => (typeof a === "string" ? a : JSON.stringify(a))).join(" ");
+        // The SDK warns that pre-approved tools bypass canUseTool. That is by design here
+        // (the guardrails run as a PreToolUse hook), so it is information, not an error.
+        const expected = /CLAUDE_SDK_CAN_USE_TOOL_SHADOWED/.test(text);
+        diag.log(level === "error" && !expected ? "error" : "server", `[stdout] ${expected ? "expected SDK note (pre-approved tools skip canUseTool; guardrails run as a hook): " : ""}${text.slice(0, 400)}`);
       };
     }
     process.on("warning", (w) => diag.log("server", `node warning: ${w.name}: ${w.message}`));

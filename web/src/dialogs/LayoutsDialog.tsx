@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { askConfirm, askPrompt } from "../ask.js";
 import type { DockviewApi } from "dockview";
 import { PRESETS, applyPreset, deleteNamedLayout, loadNamedLayout, namedLayouts, renameNamedLayout, saveNamedLayout } from "../layout.js";
 import { store, useUi } from "../store.js";
@@ -56,9 +57,9 @@ export function LayoutsDialog({ api, onClose }: { api: DockviewApi; onClose: () 
             <div key={n} className="proj-row">
               <b className="grow">{n}</b>
               <button className="btn sm" onClick={() => { loadNamedLayout(api, n); diag(`layout load "${n}"`); onClose(); }}>Load</button>
-              <button className="btn sm" title="Replace this saved layout with the current arrangement" onClick={() => { if (confirm(`Overwrite “${n}” with the current arrangement?`)) { saveNamedLayout(api, n); store.toast(`Updated “${n}”`); } }}>Overwrite</button>
-              <button className="btn sm" onClick={() => { const to = prompt(`Rename “${n}” to:`, n)?.trim(); if (to && renameNamedLayout(n, to)) refresh(); else if (to) store.toast("That name is taken or empty"); }}>Rename</button>
-              <button className="btn sm" onClick={() => { if (confirm(`Delete layout “${n}”?`)) { deleteNamedLayout(n); refresh(); } }}>Delete</button>
+              <button className="btn sm" title="Replace this saved layout with the current arrangement" onClick={() => { if (askConfirm(`Overwrite “${n}” with the current arrangement?`)) { saveNamedLayout(api, n); store.toast(`Updated “${n}”`); } }}>Overwrite</button>
+              <button className="btn sm" onClick={() => { const to = askPrompt(`Rename “${n}” to:`, n)?.trim(); if (to && renameNamedLayout(n, to)) refresh(); else if (to) store.toast("That name is taken or empty"); }}>Rename</button>
+              <button className="btn sm" onClick={() => { if (askConfirm(`Delete layout “${n}”?`)) { deleteNamedLayout(n); refresh(); } }}>Delete</button>
             </div>
           ))}
         </div>

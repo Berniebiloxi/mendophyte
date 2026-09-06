@@ -63,12 +63,12 @@ const Entry = memo(function Entry({ e }: { e: AnyEvent }) {
       return <div className="msg tool">▸ {toolLine(e.data)}</div>;
     case "turn": {
       const d = e.data as any;
-      const t = d.timing as { wallMs: number; apiMs: number | null; firstTextMs: number | null } | null | undefined;
+      const t = d.timing as { wallMs: number; apiMs: number | null; firstTextMs: number | null; waitingOnUserMs?: number } | null | undefined;
       const secs = (ms: number) => `${(ms / 1000).toFixed(1)}s`;
       return (
         <div className="msg turn" title={t ? `From your message to the result: ${secs(t.wallMs)} wall clock, of which the model API took ${t.apiMs != null ? secs(t.apiMs) : "?"}. First streamed text after ${t.firstTextMs != null ? secs(t.firstTextMs) : "?"}. The gap between wall and API time is tool execution and process overhead.` : undefined}>
           {d.interrupted ? "stopped by you" : `turn ${d.subtype}`}
-          {t ? ` · ${secs(t.wallMs)}${t.apiMs != null ? ` (api ${secs(t.apiMs)})` : ""}` : ""}
+          {t ? ` · ${secs(t.wallMs)}${t.waitingOnUserMs ? ` (${secs(t.waitingOnUserMs)} waiting on you)` : ""}${t.apiMs != null ? ` (api ${secs(t.apiMs)})` : ""}` : ""}
           {d.total_cost_usd != null ? ` · $${Number(d.total_cost_usd).toFixed(3)} so far` : ""}
           {d.stateError && !d.interrupted ? ` · no state: ${d.stateError}` : ""}
         </div>

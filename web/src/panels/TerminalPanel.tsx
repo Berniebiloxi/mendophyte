@@ -131,6 +131,12 @@ export function TerminalPanel(props: IDockviewPanelProps<{ termId?: string }>) {
             setError("This terminal no longer exists on the server (it restarted). Close the tab and open a new one.");
             return;
           }
+          if (ev.code === 1000) {
+            // the server closed it on purpose (session closed or terminal killed)
+            exited = true;
+            setStatus("exited");
+            return;
+          }
           setStatus("reconnecting");
           const delay = Math.min(8000, 400 * 2 ** attempt++);
           setTimeout(open, delay);
