@@ -97,6 +97,12 @@ MENDOPHYTE_FAKE_SESSION=1 npm start
 
 ## Troubleshooting
 
+**UI size.** Everything scales from one number: **View → UI size**.
+"Auto" picks a size from the screen the window is on (100% on laptops,
+110–130% on wide desktop monitors) and follows the window between
+monitors; the fixed steps go from 80% to 150%. Browser zoom works on top
+of it.
+
 **Start with the debug log.** Every server run writes one Markdown file
 under `~/.mendophyte/logs/` (the path is printed at startup and shown in
 **Help → Debug log**). It records every request, socket frame, session

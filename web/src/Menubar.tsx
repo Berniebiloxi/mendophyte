@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { DockviewApi } from "dockview";
 import { PANELS, buildDefaultLayout, deleteNamedLayout, loadNamedLayout, namedLayouts, newTerminal, saveNamedLayout, showPanel } from "./layout.js";
 import { api as rest } from "./api.js";
-import { store, useActiveSession, useUi } from "./store.js";
+import { UI_SCALE_STEPS, autoUiScale, store, useActiveSession, useUi } from "./store.js";
 
 function Menu({ label, children }: { label: string; children: (close: () => void) => React.ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -35,6 +35,7 @@ export function Menubar({ api }: { api: DockviewApi | null }) {
   const theme = useUi((st) => st.theme);
   const scheme = useUi((st) => st.scheme);
   const termFontSize = useUi((st) => st.termFontSize);
+  const uiScale = useUi((st) => st.uiScale);
   const active = useActiveSession();
   const [layouts, setLayouts] = useState<string[]>(() => Object.keys(namedLayouts()));
   const refreshLayouts = () => setLayouts(Object.keys(namedLayouts()));
@@ -99,6 +100,11 @@ export function Menubar({ api }: { api: DockviewApi | null }) {
             <hr />
             {(["auto", "light", "dark"] as const).map((s) => (
               <button key={s} onClick={() => { store.setScheme(s); close(); }}>Scheme: {s} {scheme === s ? <span className="kbd">●</span> : null}</button>
+            ))}
+            <hr />
+            <button onClick={() => { store.setUiScale("auto"); close(); }}>UI size: auto for this screen <span className="kbd">{Math.round(autoUiScale() * 100)}% {uiScale === "auto" ? "●" : ""}</span></button>
+            {UI_SCALE_STEPS.map((sc) => (
+              <button key={sc} onClick={() => { store.setUiScale(sc); close(); }}>UI size: {Math.round(sc * 100)}% {uiScale === sc ? <span className="kbd">●</span> : null}</button>
             ))}
             <hr />
             <button onClick={() => store.setTermFontSize(termFontSize + 1)}>Terminal font larger <span className="kbd">{termFontSize}px</span></button>

@@ -32,24 +32,29 @@ const LS_NAMED = "mendophyte.layouts";
 
 export function buildDefaultLayout(api: DockviewApi): void {
   api.clear();
+  const w = window.innerWidth || 1440;
+  const h = window.innerHeight || 900;
+  const left = Math.round(Math.max(220, Math.min(420, w * 0.17)));
+  const right = Math.round(Math.max(300, Math.min(560, w * 0.24)));
+  const bottom = Math.round(Math.max(160, Math.min(360, h * 0.26)));
   api.addPanel({ id: "conversation", component: "conversation", title: "Conversation" });
   api.addPanel({ id: "artifacts", component: "artifacts", title: "Artifacts", position: { referencePanel: "conversation", direction: "within" } });
   api.addPanel({ id: "transcript", component: "transcript", title: "Transcript", position: { referencePanel: "conversation", direction: "within" } });
   api.getPanel("conversation")?.api.setActive();
-  api.addPanel({ id: "spine", component: "spine", title: "Progress", position: { referencePanel: "conversation", direction: "left" }, initialWidth: 250 });
+  api.addPanel({ id: "spine", component: "spine", title: "Progress", position: { referencePanel: "conversation", direction: "left" }, initialWidth: left });
   api.addPanel({ id: "files", component: "files", title: "Files", position: { referencePanel: "spine", direction: "within" } });
   api.getPanel("spine")?.api.setActive();
   api.addPanel({ id: "capability", component: "capability", title: "Capability", position: { referencePanel: "spine", direction: "below" } });
   api.addPanel({ id: "session", component: "session", title: "Session", position: { referencePanel: "capability", direction: "within" } });
   api.getPanel("capability")?.api.setActive();
-  api.addPanel({ id: "yourturn", component: "yourturn", title: "Your turn", position: { referencePanel: "conversation", direction: "right" }, initialWidth: 340 });
+  api.addPanel({ id: "yourturn", component: "yourturn", title: "Your turn", position: { referencePanel: "conversation", direction: "right" }, initialWidth: right });
   api.addPanel({ id: "triage", component: "triage", title: "Triage", position: { referencePanel: "yourturn", direction: "within" } });
   api.getPanel("yourturn")?.api.setActive();
   api.addPanel({ id: "verification", component: "verification", title: "Verification", position: { referencePanel: "yourturn", direction: "below" } });
   api.addPanel({ id: "submission", component: "submission", title: "Submission", position: { referencePanel: "verification", direction: "within" } });
   api.addPanel({ id: "feedback", component: "feedback", title: "Feedback log", position: { referencePanel: "verification", direction: "within" } });
   api.getPanel("verification")?.api.setActive();
-  api.addPanel({ id: "diff", component: "diff", title: "Diff", position: { referencePanel: "conversation", direction: "below" }, initialHeight: 230 });
+  api.addPanel({ id: "diff", component: "diff", title: "Diff", position: { referencePanel: "conversation", direction: "below" }, initialHeight: bottom });
   api.addPanel({ id: "terminal:default", component: "terminal", title: "Terminal", params: {}, position: { referencePanel: "diff", direction: "within" } });
   api.getPanel("diff")?.api.setActive();
 }

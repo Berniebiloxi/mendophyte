@@ -41,11 +41,32 @@ export interface UiState {
   theme: ThemeName;
   scheme: SchemeName;
   termFontSize: number;
+  /** Global UI size: "auto" picks from the screen, otherwise a multiplier (1 = 100%). */
+  uiScale: UiScale;
   toast: string | null;
 }
 
+export type UiScale = "auto" | number;
+export const UI_SCALE_STEPS = [0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.5] as const;
+
+/**
+ * A sensible size for the screen the window is on. Wide desktop monitors
+ * at 1x get a larger UI; laptops stay at 100%. CSS pixels already account
+ * for the OS scale factor, so a 4K monitor at 200% reads as 1920 here.
+ */
+export function autoUiScale(): number {
+  const w = Math.max(window.screen?.width ?? 0, window.innerWidth);
+  if (w >= 3800) return 1.3;
+  if (w >= 3000) return 1.2;
+  if (w >= 2400) return 1.1;
+  return 1;
+}
+export function effectiveUiScale(s: UiScale): number {
+  return s === "auto" ? autoUiScale() : s;
+}
+
 const EVENT_CAP = 1500;
-const LS = { theme: "mendophyte.theme", scheme: "mendophyte.scheme", active: "mendophyte.activeSession", termFont: "mendophyte.termFontSize" };
+const LS = { theme: "mendophyte.theme", scheme: "mendophyte.scheme", active: "mendophyte.activeSession", termFont: "mendophyte.termFontSize", uiScale: "mendophyte.uiScale" };
 
 class Store {
   state: UiState;
@@ -67,8 +88,16 @@ class Store {
       theme: (safeGet(LS.theme) as ThemeName) || "vine",
       scheme: (safeGet(LS.scheme) as SchemeName) || "auto",
       termFontSize: Number(safeGet(LS.termFont)) || 13,
+      uiScale: readScale(safeGet(LS.uiScale)),
       toast: null,
     };
+  }
+
+  setUiScale(scale: UiScale) {
+    diag(`ui scale ${scale === "auto" ? `auto (${Math.round(autoUiScale() * 100)}%)` : `${Math.round(scale * 100)}%`}`);
+    safeSet(LS.uiScale, String(scale));
+    this.set({ uiScale: scale });
+    this.applyTheme();
   }
 
   setTermFontSize(px: number) {
@@ -94,6 +123,15 @@ class Store {
   boot() {
     this.applyTheme();
     this.connect();
+    // Moving the window to another monitor changes the screen; "auto" follows it.
+    let lastW = window.screen?.width ?? 0;
+    window.addEventListener("resize", () => {
+      const w = window.screen?.width ?? 0;
+      if (w !== lastW) {
+        lastW = w;
+        if (this.state.uiScale === "auto") this.applyTheme();
+      }
+    });
   }
 
   setTheme(theme: ThemeName) {
@@ -111,6 +149,7 @@ class Store {
   private applyTheme() {
     document.documentElement.dataset.theme = this.state.theme;
     document.documentElement.dataset.scheme = this.state.scheme;
+    document.documentElement.style.setProperty("--m-ui-scale", String(effectiveUiScale(this.state.uiScale)));
   }
 
   toast(msg: string) {
@@ -299,6 +338,11 @@ class Store {
   }
 }
 
+function readScale(raw: string | null): UiScale {
+  if (!raw || raw === "auto") return "auto";
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0.5 && n <= 2 ? n : "auto";
+}
 function safeGet(k: string): string | null {
   try {
     return localStorage.getItem(k);
