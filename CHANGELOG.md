@@ -7,6 +7,8 @@ number lives in package.json and is read from there everywhere
 
 ## 0.4.1 — 2026-09-07
 
+- Project rows wrap in a narrow tile so the name keeps its space and
+  the actions drop to a second line.
 - The prior-projects list could collapse to nothing in a short Session
   tile (a scrolling flex child with min-height 0). It keeps its height.
 

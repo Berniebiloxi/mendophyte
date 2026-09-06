@@ -86,7 +86,7 @@ export function SessionPanel() {
       {projects.length > 0 && (
         <>
           <h3>Prior projects (artifact homes)</h3>
-          <div className="faint" style={{ marginBottom: 4 }}>Each folder holds one repository's notes A–F, feedback log, benchmarks and snapshots. Starting a session on the same repository reuses it.</div>
+          <div className="faint" style={{ marginBottom: 4 }}>One folder per repository: notes A–F, feedback log, benchmarks, snapshots.</div>
           <div className="proj-list">
             {projects.map((p) => {
               const live = sessions.some((s) => s.artifactHome === p.artifactHome && s.status !== "ended" && s.status !== "error");
