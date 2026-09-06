@@ -2,7 +2,7 @@
 import { Command } from "commander";
 import open from "open";
 import { startServer } from "./server/index.js";
-import { probeInstance, requestShutdown } from "./server/probe.js";
+import { findListener, killHolder, probeInstance, requestShutdown } from "./server/probe.js";
 
 const program = new Command();
 
@@ -31,10 +31,22 @@ program
         const ok = await requestShutdown(port);
         console.log(ok ? `Stopped the Mendophyte instance on port ${port}${existing.pid ? ` (pid ${existing.pid})` : ""}.` : `Asked the instance on port ${port} to stop, but it is still answering.`);
         process.exitCode = ok ? 0 : 1;
-      } else {
-        console.log(existing === "other" ? `Port ${port} is in use, but not by Mendophyte.` : `Nothing is running on port ${port}.`);
-        process.exitCode = existing === "other" ? 1 : 0;
+        return;
       }
+      const holder = existing === null ? await findListener(port) : null;
+      if (holder?.looksLikeMendophyte) {
+        const ok = await killHolder(holder, port);
+        console.log(ok ? `Stopped a stuck Mendophyte process on port ${port} (pid ${holder.pid}).` : `Could not stop pid ${holder.pid}; try: kill -9 ${holder.pid}`);
+        process.exitCode = ok ? 0 : 1;
+        return;
+      }
+      if (holder) {
+        console.log(`Port ${port} is held by pid ${holder.pid} (${holder.command ?? "unknown command"}), which is not Mendophyte; leaving it alone.`);
+        process.exitCode = 1;
+        return;
+      }
+      console.log(existing === "other" ? `Port ${port} is in use, but not by Mendophyte.` : `Nothing is running on port ${port}.`);
+      process.exitCode = existing === "other" ? 1 : 0;
       return;
     }
 
@@ -70,9 +82,42 @@ program
     try {
       url = await startServer(port);
     } catch (e) {
-      console.error(e instanceof Error ? e.message : String(e));
-      process.exitCode = 1;
-      return;
+      if ((e as NodeJS.ErrnoException)?.code !== "EADDRINUSE") {
+        console.error(e instanceof Error ? e.message : String(e));
+        process.exitCode = 1;
+        return;
+      }
+      // Bound but not answering as Mendophyte: find out who, and clear a stuck older instance on request.
+      const holder = await findListener(port);
+      if (holder?.looksLikeMendophyte && opts.replace) {
+        console.log(`Port ${port} is held by a Mendophyte process that isn't responding (pid ${holder.pid}); stopping it…`);
+        if (await killHolder(holder, port)) {
+          try {
+            url = await startServer(port);
+          } catch (e2) {
+            console.error(e2 instanceof Error ? e2.message : String(e2));
+            process.exitCode = 1;
+            return;
+          }
+        } else {
+          console.error(`Could not free port ${port}. Try: kill -9 ${holder.pid}`);
+          process.exitCode = 1;
+          return;
+        }
+      } else {
+        console.error(
+          holder
+            ? [
+                `Port ${port} is held by pid ${holder.pid}${holder.command ? ` (${holder.command.slice(0, 120)})` : ""}, which is not answering as Mendophyte.`,
+                holder.looksLikeMendophyte
+                  ? `  It looks like a stuck Mendophyte process. Run: mendophyte --replace   (or: kill ${holder.pid})`
+                  : `  Stop that program or run: mendophyte --port <other>`,
+              ].join("\n")
+            : `Port ${port} is in use, but no owning process could be identified (a stale socket, or a process owned by another user). Wait a moment and retry, or use --port <other>.`
+        );
+        process.exitCode = 1;
+        return;
+      }
     }
     console.log(`mendophyte running at ${url}  (Ctrl-C to stop)`);
 
