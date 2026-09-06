@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 import { store, useActiveSession, useUi } from "../store.js";
 import type { QuestionAnswers, QuestionView } from "../types.js";
+import { renderInline } from "../markdown.js";
+
+/** Inline-formatted text (bold, code, links) from the agent; sanitized. */
+function Inline({ text, className }: { text: string; className?: string }) {
+  return <span className={className} dangerouslySetInnerHTML={{ __html: renderInline(text) }} />;
+}
 
 const KIND_LABEL: Record<string, string> = {
   answer_question: "question",
@@ -58,7 +64,7 @@ function QuestionCard({ q }: { q: QuestionView }) {
           <div className="qc-title">
             {q.questions.length > 1 && <span className="qc-n">{qi + 1}</span>}
             <span className="tag accent">{x.header}</span>
-            <b>{x.question}</b>
+            <b><Inline text={x.question} /></b>
           </div>
           <div className="qc-options" role={x.multiSelect ? "group" : "radiogroup"}>
             {x.options.map((o) => {
@@ -69,7 +75,7 @@ function QuestionCard({ q }: { q: QuestionView }) {
                   <span className="qc-mark" aria-hidden="true">{on ? "✓" : ""}</span>
                   <span className="qc-text">
                     <b>{o.label}</b>
-                    {o.description && <span className="muted">{o.description}</span>}
+                    {o.description && <Inline className="muted" text={o.description} />}
                   </span>
                 </label>
               );
@@ -146,7 +152,7 @@ export function YourTurnPanel() {
               {it.blocks !== "none" && <span className="tag warn">locks {it.blocks}</span>}
               {done && <span className="tag">sent, awaiting agent</span>}
             </div>
-            <div className="prompt">{it.prompt}</div>
+            <div className="prompt"><Inline text={it.prompt} /></div>
             {!done && (
               <textarea
                 value={answers[it.id] ?? ""}

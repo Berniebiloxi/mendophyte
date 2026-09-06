@@ -910,3 +910,41 @@ pre.out, .md pre, .modal .cmd { border-radius: 0.625rem; box-shadow: var(--m-cla
 .preset:hover { transform: translateY(-1px); box-shadow: var(--m-clay-hover); border-color: var(--m-accent); }
 .preset .muted, .preset .faint { font-size: 0.72rem; }
 .menu > button { transition: background 60ms linear; }
+
+/* ---- rich replies ------------------------------------------------------ */
+/* The agent's Markdown, rendered. `.prose` is the shared text styling; a  */
+/* reply with headings becomes a stack of titled boxes.                     */
+.msg.rich { white-space: normal; max-width: min(96%, 96ch); padding: 0.25rem 0.9rem 0.6rem; }
+.msg.rich.sectioned { padding: 0.35rem 0.6rem 0.6rem; background: color-mix(in srgb, var(--m-panel-2) 60%, transparent); }
+.prose { line-height: 1.5; }
+.prose > :first-child { margin-top: 0.35rem; }
+.prose > :last-child { margin-bottom: 0.2rem; }
+.prose p { margin: 0.4rem 0; }
+.prose ul, .prose ol { margin: 0.35rem 0; padding-left: 1.3rem; }
+.prose li { margin: 0.15rem 0; }
+.prose li > p { margin: 0.1rem 0; }
+.prose h1, .prose h2, .prose h3, .prose h4 { font-family: var(--m-font-serif); font-weight: 500; margin: 0.8rem 0 0.3rem; line-height: 1.25; }
+.prose h1 { font-size: 1.15rem; } .prose h2 { font-size: 1.05rem; } .prose h3 { font-size: 0.95rem; } .prose h4 { font-size: 0.875rem; }
+.prose code { background: var(--m-code-bg); padding: 0.05rem 0.3rem; border-radius: 0.25rem; font-size: 0.78rem; }
+.prose pre { background: var(--m-code-bg); border: 1px solid var(--m-group-border); border-radius: 0.6rem; padding: 0.55rem 0.7rem; overflow: auto; margin: 0.5rem 0; box-shadow: var(--m-clay-in); }
+.prose pre code { background: transparent; padding: 0; font-size: 0.76rem; }
+.prose table { border-collapse: separate; border-spacing: 0; margin: 0.5rem 0; font-size: 0.78rem; display: block; max-width: 100%; overflow-x: auto; }
+.prose th, .prose td { border-bottom: 1px solid var(--m-group-border); padding: 0.3rem 0.6rem; text-align: left; vertical-align: top; }
+.prose th { background: color-mix(in srgb, var(--m-bg-2) 70%, transparent); font-weight: 600; color: var(--m-ink-2); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.prose tr:last-child td { border-bottom: 0; }
+.prose blockquote { margin: 0.5rem 0; padding: 0.2rem 0.8rem; border-left: 3px solid var(--m-accent-soft); color: var(--m-ink-2); }
+.prose hr { border: 0; border-top: 1px dashed var(--m-border); margin: 0.6rem 0; }
+.prose a { color: var(--m-accent); }
+.prose strong { color: var(--m-ink); }
+.prose img { max-width: 100%; }
+/* section boxes */
+.sec { margin: 0.45rem 0; padding: 0.5rem 0.75rem 0.55rem; border-radius: 0.75rem; background: var(--m-panel); border: 1px solid var(--m-group-border); box-shadow: var(--m-clay-btn); }
+.sec + .sec { margin-top: 0.5rem; }
+.sec-title { margin: 0 0 0.25rem; font-family: var(--m-font-serif); font-weight: 500; font-size: 0.95rem; color: var(--m-accent); display: flex; align-items: center; gap: 0.5rem; }
+.sec-title::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, var(--m-accent-soft), transparent); }
+.sec.lv1 .sec-title { font-size: 1.05rem; }
+.sec.lv3 .sec-title, .sec.lv4 .sec-title { font-size: 0.85rem; color: var(--m-ink-2); }
+.sec .prose > :first-child { margin-top: 0.15rem; }
+.msg.rich.sectioned > .prose { padding: 0.2rem 0.3rem 0; }
+/* inline formatting inside cards */
+.qc-title code, .prompt code, .qc-text code { background: var(--m-code-bg); padding: 0 0.25rem; border-radius: 0.2rem; font-size: 0.9em; }

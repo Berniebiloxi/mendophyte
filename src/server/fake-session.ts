@@ -123,7 +123,25 @@ export class FakeSession extends EventEmitter implements SessionLike {
           path.join(this.config.artifactHome, "D-glossary.md"),
           "# Glossary (Artifact D)\n\n- **churn** — how often a file changes in git history. Introduced in Phase 2.\n- **astral plane** — Unicode code points above U+FFFF, which UTF-16 stores as two units. Introduced in Phase 4.\n"
         ).catch(() => {});
-        this.say("Recon notes drafted to Artifact A. On to Phase 3. I scanned the open issues (full forge access); here are three ranked candidates, with two filtered out. Pick one from the Triage board and I'll do the deep pass.");
+        this.say(
+          [
+            "Recon notes drafted to Artifact A. On to Phase 3.",
+            "",
+            "## What I found",
+            "",
+            "I scanned the open issues (full forge access); here are three ranked candidates, with two filtered out.",
+            "",
+            "| # | Issue | Why it ranks |",
+            "|---|---|---|",
+            "| 1 | Lexer mis-tokenises astral-plane code points | reproduces first try, one function |",
+            "| 2 | `--config` flag ignored before the subcommand | small, but touches CLI parsing |",
+            "| 3 | Flaky retry test | needs the CI logs we cannot see |",
+            "",
+            "## Recommendation",
+            "",
+            "Pick one from the **Triage board** and I'll do the deep pass. Candidate #1 is the safest start.",
+          ].join("\n")
+        );
         this.state({
           phase: 3,
           phase_complete: false,

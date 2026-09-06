@@ -97,6 +97,11 @@ MENDOPHYTE_FAKE_SESSION=1 npm start
 
 ## Troubleshooting
 
+**Replies are rendered.** The agent writes Markdown, and the conversation
+renders it: each heading becomes a titled box, tables and code render as
+such, question cards render inline formatting. Everything is sanitized
+before it reaches the page.
+
 **Is the agent working or stuck?** While a turn is in progress the
 conversation shows the agent's text as it streams, a leaf loader when
 nothing has arrived yet, and "working" in the menubar. Each finished turn

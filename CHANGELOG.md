@@ -5,6 +5,14 @@ batch of user-visible changes, the patch number with fixes only. The
 number lives in package.json and is read from there everywhere
 (health endpoint, SDK client string, MCP server, About box).
 
+## 0.3.0 — 2026-09-07
+
+- The agent's replies are rendered as Markdown in the conversation: each
+  heading becomes a titled box, tables become tables, code fences become
+  code, lists and emphasis render. Plain replies stay plain. Question
+  cards and your-turn prompts render inline formatting (bold, code,
+  links). All of it passes through the same sanitizer as artifacts.
+
 ## 0.2.0 — 2026-09-06
 
 The first day of real use on langchain and seatsniper, and everything it

@@ -1,7 +1,8 @@
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api.js";
 import { store, useActiveSession, useSessionEvents, useUi } from "../store.js";
 import type { AnyEvent } from "../types.js";
+import { looksLikeMarkdown, renderMarkdown, splitSections } from "../markdown.js";
 
 function toolLine(data: any): string {
   const name = String(data?.name ?? "");
@@ -15,10 +16,38 @@ function toolLine(data: any): string {
   return `${name} ${JSON.stringify(data?.input ?? {}).slice(0, 120)}`;
 }
 
+/**
+ * An assistant reply. Agents write Markdown, and its structure is reliable
+ * enough to lean on: each heading starts a titled box, tables become
+ * tables, fences become code. Plain replies stay plain.
+ */
+const Assistant = memo(function Assistant({ text }: { text: string }) {
+  const sections = useMemo(() => {
+    if (!looksLikeMarkdown(text)) return null;
+    return splitSections(text).map((s) => ({ ...s, html: renderMarkdown(s.body) }));
+  }, [text]);
+  if (!sections) return <div className="msg assistant">{text}</div>;
+  const titled = sections.some((s) => s.title !== null);
+  return (
+    <div className={`msg assistant rich${titled ? " sectioned" : ""}`}>
+      {sections.map((s, i) =>
+        s.title === null ? (
+          <div key={i} className="prose" dangerouslySetInnerHTML={{ __html: s.html }} />
+        ) : (
+          <section key={i} className={`sec lv${s.level}`}>
+            <h4 className="sec-title">{s.title}</h4>
+            {s.body.trim() && <div className="prose" dangerouslySetInnerHTML={{ __html: s.html }} />}
+          </section>
+        )
+      )}
+    </div>
+  );
+});
+
 const Entry = memo(function Entry({ e }: { e: AnyEvent }) {
   switch (e.event) {
     case "assistant_text":
-      return <div className="msg assistant">{(e.data as any).text}</div>;
+      return <Assistant text={(e.data as any).text} />;
     case "user_text": {
       const d = e.data as { text: string; kickoff?: boolean };
       if (d.kickoff)
@@ -40,7 +69,7 @@ const Entry = memo(function Entry({ e }: { e: AnyEvent }) {
         <div className="msg turn" title={t ? `From your message to the result: ${secs(t.wallMs)} wall clock, of which the model API took ${t.apiMs != null ? secs(t.apiMs) : "?"}. First streamed text after ${t.firstTextMs != null ? secs(t.firstTextMs) : "?"}. The gap between wall and API time is tool execution and process overhead.` : undefined}>
           {d.interrupted ? "stopped by you" : `turn ${d.subtype}`}
           {t ? ` · ${secs(t.wallMs)}${t.apiMs != null ? ` (api ${secs(t.apiMs)})` : ""}` : ""}
-          {d.total_cost_usd != null ? ` · ${Number(d.total_cost_usd).toFixed(3)} so far` : ""}
+          {d.total_cost_usd != null ? ` · $${Number(d.total_cost_usd).toFixed(3)} so far` : ""}
           {d.stateError && !d.interrupted ? ` · no state: ${d.stateError}` : ""}
         </div>
       );
