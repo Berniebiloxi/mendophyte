@@ -24,10 +24,12 @@ export interface ServerHandle {
  * /api, the event stream at /ws and pty bridges at /ws/terminal/:id.
  * `port: 0` picks a free port (tests). `factory` swaps the real Agent SDK
  * session for a fake so the transport can be tested without a model.
+ * `onShutdown` is what POST /api/shutdown triggers (the CLI's --replace).
  */
-export async function createMendophyteServer(opts: { port: number; host?: string; factory?: SessionFactory }): Promise<ServerHandle> {
+export async function createMendophyteServer(opts: { port: number; host?: string; factory?: SessionFactory; onShutdown?: () => void }): Promise<ServerHandle> {
   const app = express();
   app.use(express.json({ limit: "1mb" }));
+  const startedAt = new Date().toISOString();
 
   // src/server/index.ts -> dist/server/index.js at runtime, so this
   // walks up two levels to the package root, then into public/.
@@ -37,6 +39,14 @@ export async function createMendophyteServer(opts: { port: number; host?: string
   const manager = new SessionManager({ factory: opts.factory });
   const terminals = new TerminalManager();
   manager.on("session.removed", (id) => terminals.killForSession(id));
+
+  app.get("/api/health", (_req, res) => {
+    res.json({ status: "ok", name: "mendophyte", version: "0.1.0", pid: process.pid, startedAt, sessions: manager.list().length, pendingApprovals: manager.pendingApprovals().length });
+  });
+  app.post("/api/shutdown", (_req, res) => {
+    res.json({ ok: true, pid: process.pid });
+    setTimeout(() => opts.onShutdown?.(), 50);
+  });
   app.use("/api", apiRoutes(manager, terminals));
 
   const http = createServer(app);
@@ -45,7 +55,7 @@ export async function createMendophyteServer(opts: { port: number; host?: string
   const host = opts.host ?? "127.0.0.1";
   await new Promise<void>((resolve, reject) => {
     http.once("error", (err: NodeJS.ErrnoException) => {
-      reject(err.code === "EADDRINUSE" ? new Error(`Port ${opts.port} is already in use.`) : err);
+      reject(err.code === "EADDRINUSE" ? Object.assign(new Error(`Port ${opts.port} is already in use.`), { code: "EADDRINUSE" }) : err);
     });
     http.listen(opts.port, host, () => resolve());
   });
@@ -65,6 +75,8 @@ export async function createMendophyteServer(opts: { port: number; host?: string
       for (const c of term.clients) c.terminate();
       await new Promise<void>((r) => hub.close(() => r()));
       await new Promise<void>((r) => term.close(() => r()));
+      // Browser tabs hold keep-alive connections; without this, close() waits on them forever.
+      http.closeAllConnections?.();
       await new Promise<void>((r) => http.close(() => r()));
     },
   };
@@ -78,11 +90,18 @@ export async function startServer(port: number): Promise<string> {
     factory = (c) => new FakeSession(c);
     console.warn("MENDOPHYTE_FAKE_SESSION=1: sessions are scripted fakes, no agent runs.");
   }
-  const handle = await createMendophyteServer({ port, factory });
-  const shutdown = () => {
+  let shuttingDown = false;
+  const shutdown = (why: string) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.log(`\nmendophyte: shutting down (${why})`);
+    // Never hang the terminal: if a clean close stalls, exit anyway.
+    setTimeout(() => process.exit(1), 4000).unref();
     void handle.close().finally(() => process.exit(0));
   };
-  process.once("SIGINT", shutdown);
-  process.once("SIGTERM", shutdown);
+  const handle = await createMendophyteServer({ port, factory, onShutdown: () => shutdown("shutdown requested") });
+  process.once("SIGINT", () => shutdown("SIGINT"));
+  process.once("SIGTERM", () => shutdown("SIGTERM"));
+  process.once("SIGHUP", () => shutdown("terminal closed"));
   return handle.url;
 }

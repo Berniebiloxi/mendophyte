@@ -49,10 +49,6 @@ export function apiRoutes(manager: SessionManager, terminals: TerminalManager): 
       Promise.resolve(fn(req, res)).catch(next);
     };
 
-  r.get("/health", (_req, res) => {
-    res.json({ status: "ok", name: "mendophyte", version: "0.1.0", sessions: manager.list().length, pendingApprovals: manager.pendingApprovals().length });
-  });
-
   // ---- prior projects: one artifact home per repository under ~/.mendophyte
   r.get(
     "/projects",

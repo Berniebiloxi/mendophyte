@@ -81,6 +81,8 @@ browser.
 ```
 mendophyte --port 5000     # use a different port
 mendophyte --no-open       # don't open the browser
+mendophyte --replace       # take over from an instance already on the port (after git pull)
+mendophyte --stop          # stop the instance on the port
 ```
 
 For a look at the UI without spending tokens:
@@ -97,7 +99,11 @@ MENDOPHYTE_FAKE_SESSION=1 npm start
   even if it never builds; the panel will say so.
 - **The session never produces a first turn:** run `claude` in a terminal
   and make sure it is logged in; Mendophyte inherits that login.
-- **"Port 4317 is already in use":** pass `--port`.
+- **"Mendophyte is already running at http://localhost:4317":** a previous
+  instance is still up (for example after `git pull`). `mendophyte --replace`
+  asks it to shut down and starts the new code in its place; `mendophyte
+  --stop` just stops it; `--port <other>` runs a second copy. If the port
+  is held by a different program, only `--port` helps.
 - **Starting Mendophyte from inside a Claude Code terminal:** works; the
   nesting guard is stripped for the sessions Mendophyte spawns.
 - **Platforms:** CI runs the build, type-check and unit suite on Linux,
