@@ -79,3 +79,39 @@ test("guardrail: extracts command from tool input", () => {
   assert.equal(commandFromToolInput({}), "");
   assert.equal(commandFromToolInput(null), "");
 });
+
+test("guardrail: forge writes beyond PR creation need confirmation; reads stay free", () => {
+  assert.equal(id("gh issue create --title x --body y"), "forge-write");
+  assert.equal(id("cd /r && gh issue create -F body.md"), "forge-write");
+  assert.equal(id("gh issue comment 40235 --body ok"), "forge-write");
+  assert.equal(id("gh pr comment 12 --body lgtm"), "forge-write");
+  assert.equal(id("gh pr review 12 --approve"), "forge-write");
+  assert.equal(id("gh pr merge 12 --squash"), "forge-write");
+  assert.equal(id("gh repo fork langchain-ai/langchain --remote"), "forge-write");
+  assert.equal(id("gh release create v1.0"), "forge-write");
+  assert.equal(id("gh api -X POST repos/o/r/issues -f title=x"), "forge-write");
+  assert.equal(id("gh api repos/o/r/issues --method PATCH -f state=closed"), "forge-write");
+  assert.equal(id("gh api repos/o/r/issues -f title=x"), "forge-write");
+  assert.equal(id("gh api graphql -F query=@q.graphql"), "forge-write");
+  assert.equal(id("glab issue create -t x"), "forge-write");
+  assert.equal(id("glab mr note 3 -m hi"), "forge-write");
+  // PR creation keeps its sharper rule
+  assert.equal(id("gh pr create --fill"), "open-pull-request");
+  // reads
+  assert.equal(id("gh issue list --repo o/r --state open"), null);
+  assert.equal(id("gh issue view 40235 --comments"), null);
+  assert.equal(id("gh pr list --search 'import'"), null);
+  assert.equal(id("gh pr view 12 --json statusCheckRollup"), null);
+  assert.equal(id("gh pr checkout 12"), null);
+  assert.equal(id("gh pr diff 12"), null);
+  assert.equal(id("gh api repos/o/r/pulls/12"), null);
+  assert.equal(id("gh api repos/o/r/issues?state=open --paginate"), null);
+  assert.equal(id("gh api -X GET repos/o/r"), null);
+  assert.equal(id("gh auth status"), null);
+  assert.equal(id("gh search issues --repo o/r 'import time'"), null);
+  assert.equal(id("gh repo view o/r --json isArchived"), null);
+  assert.equal(id("gh repo clone o/r"), null);
+  assert.equal(id("gh run list"), null);
+  assert.equal(id("glab issue list"), null);
+  assert.equal(id("glab mr view 3"), null);
+});

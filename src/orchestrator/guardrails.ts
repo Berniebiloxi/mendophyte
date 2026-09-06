@@ -95,6 +95,26 @@ export const DEFAULT_GUARDRAIL_RULES: GuardrailRule[] = [
       re(`\\bglab\\s+mr\\s+create\\b`).test(c) ||
       re(`\\bhub\\s+pull-request\\b`).test(c),
   },
+  {
+    // Anything else that writes to the forge is just as outward-facing as a
+    // PR: an issue, a comment, a review, a fork, a release, or a raw API
+    // call that creates or changes something. Read-only gh/glab (list,
+    // view, status, search, checkout, GET api) stays free.
+    id: "forge-write",
+    description: "Write to the forge (issue, comment, review, fork, release, or API call that creates or changes something public)",
+    severity: "confirm",
+    test: (c) =>
+      re(`\\bgh\\s+issue\\s+(create|comment|edit|close|reopen|delete|transfer|pin|unpin|lock|unlock|develop)${W}`).test(c) ||
+      re(`\\bgh\\s+pr\\s+(comment|review|merge|close|reopen|edit|ready|lock|unlock|update-branch)${W}`).test(c) ||
+      re(`\\bgh\\s+repo\\s+(fork|create|delete|archive|unarchive|edit|rename|sync|set-default)${W}`).test(c) ||
+      re(`\\bgh\\s+(release|gist|label)\\s+(create|edit|delete|upload)${W}`).test(c) ||
+      // gh api: an explicit write method, or fields/input (which make gh default to POST)
+      re(`\\bgh\\s+api\\b${SEG}(-X|--method)[\\s=]+(POST|PUT|PATCH|DELETE)\\b`).test(c) ||
+      re(`\\bgh\\s+api\\b${SEG}\\s(-f|-F|--field|--raw-field|--input)${W}`).test(c) ||
+      re(`\\bglab\\s+issue\\s+(create|note|comment|close|reopen|update|delete)${W}`).test(c) ||
+      re(`\\bglab\\s+mr\\s+(note|comment|approve|merge|close|reopen|update|delete)${W}`).test(c) ||
+      re(`\\bglab\\s+repo\\s+(fork|create|delete)${W}`).test(c),
+  },
 ];
 
 /**

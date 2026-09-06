@@ -215,7 +215,8 @@ It kicks off the meta-prompt (`00-entry.md`, Phase 0 step 0), prints
 what the agent says and does, shows the structured dashboard state after
 every turn, and asks `y/N` in the terminal whenever a guardrail command
 (commit, push, force-push, hard reset, history rewrite, recursive delete,
-opening a PR) needs your confirmation. Type to reply; `/end` finishes.
+opening a PR, or any other write to the forge such as creating an issue,
+commenting, reviewing, forking or a mutating `gh api` call) needs your confirmation. Type to reply; `/end` finishes.
 
 Artifacts default to `~/.mendophyte/<repo-name>/`. The six meta-prompt
 files are read by the agent from `prompts/`; they are the authoritative
