@@ -274,12 +274,13 @@ export async function computeFragility(opts: FragilityOptions): Promise<Fragilit
   };
 
   // ---- markers
-  const grepArgs = ["grep", "-n", "-I", "-E", "\\b(TODO|FIXME|HACK|XXX)\\b", "--"];
+  // `-w` for whole words rather than `\b`: macOS git grep uses BSD regex, where `\b` is not supported.
+  const grepArgs = ["grep", "-n", "-I", "-w", "-E", "(TODO|FIXME|HACK|XXX)", "--"];
   grepArgs.push(subpath ?? ".");
   const grep = await run("git", grepArgs, { cwd: opts.repoDir, timeoutMs: 120_000 });
   // exit 1 = no matches, which is fine
   if (grep.ok || grep.code === 1) {
-    sources.push("git grep -n -I -E '\\b(TODO|FIXME|HACK|XXX)\\b'");
+    sources.push("git grep -n -I -w -E '(TODO|FIXME|HACK|XXX)'");
     for (const line of grep.stdout.split("\n")) {
       const idx = line.indexOf(":");
       if (idx <= 0) continue;

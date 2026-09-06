@@ -1,7 +1,9 @@
 import { EventEmitter } from "node:events";
 import { randomUUID } from "node:crypto";
+import { chmodSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import os from "node:os";
+import path from "node:path";
 import type { WebSocket } from "ws";
 
 /**
@@ -25,11 +27,29 @@ export function loadPty(): NodePty | null {
   if (ptyModule !== undefined) return ptyModule;
   try {
     ptyModule = require("node-pty") as NodePty;
+    ensureSpawnHelperExecutable();
   } catch (e) {
     ptyModule = null;
     lastPtyError = e instanceof Error ? e.message : String(e);
   }
   return ptyModule;
+}
+
+/**
+ * On macOS node-pty forks through a small `spawn-helper` binary shipped in
+ * its prebuilds. npm sometimes installs it without the execute bit, and
+ * the symptom is an opaque "posix_spawnp failed". Restore the bit once.
+ */
+function ensureSpawnHelperExecutable(): void {
+  if (process.platform !== "darwin") return;
+  try {
+    const pkgDir = path.dirname(require.resolve("node-pty/package.json"));
+    const helper = path.join(pkgDir, "prebuilds", `${process.platform}-${process.arch}`, "spawn-helper");
+    const st = statSync(helper);
+    if ((st.mode & 0o111) === 0) chmodSync(helper, st.mode | 0o755);
+  } catch {
+    /* no prebuilt helper (built from source) or not writable; spawning will report if it matters */
+  }
 }
 let lastPtyError: string | null = null;
 export function ptyLoadError(): string | null {

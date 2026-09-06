@@ -1,0 +1,4 @@
+# Keep the meta-prompt files (the authoritative spec) and all text byte-identical on every platform.
+* text=auto eol=lf
+*.png binary
+*.ico binary

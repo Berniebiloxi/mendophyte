@@ -30,8 +30,10 @@ test("extracts exactly the three persistent sections from the real 00-entry.md",
   assert.ok(!combined.includes("## How These Files Load"));
   assert.ok(!combined.includes("Experience level."));
 
-  // Each section's text is a contiguous substring of the source file.
-  for (const s of Object.values(sections)) assert.ok(entry.includes(s));
+  // Each section's text is a contiguous substring of the source file
+  // (line endings normalised, in case a checkout converted them).
+  const lf = entry.replace(/\r\n/g, "\n");
+  for (const s of Object.values(sections)) assert.ok(lf.includes(s));
 });
 
 test("fails loudly when a section is missing", () => {
