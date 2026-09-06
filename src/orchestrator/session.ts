@@ -12,7 +12,7 @@ import {
   type SDKUserMessage,
 } from "@anthropic-ai/claude-agent-sdk";
 
-import { ApprovalBroker } from "./approvals.js";
+import { ApprovalBroker, QuestionBroker, type AskQuestion } from "./approvals.js";
 import { buildAppendSystemPrompt, loadPersistentSections } from "./entry-sections.js";
 import {
   DEFAULT_GUARDRAIL_RULES,
@@ -36,6 +36,8 @@ export interface SessionConfig {
   /** Absolute path to the directory holding the six meta-prompt files. */
   promptDir: string;
   approvals: ApprovalBroker;
+  /** Where the agent's AskUserQuestion calls go. Optional; without one they are declined with a hint to ask in prose. */
+  questions?: QuestionBroker;
   guardrails?: GuardrailRule[];
   /** Model alias or id. Omit to use the user's own Claude Code default. */
   model?: string;
@@ -179,6 +181,7 @@ export class MendophyteSession extends EventEmitter {
     this.inputClosed = true;
     this.wake?.();
     this.config.approvals.denyAll("Session closed.");
+    this.config.questions?.dismissAll("Session closed.");
     this.q?.close();
   }
 
@@ -221,6 +224,14 @@ export class MendophyteSession extends EventEmitter {
     };
 
     const canUseTool: CanUseTool = async (toolName, input, { signal }) => {
+      if (toolName === "AskUserQuestion") {
+        // Claude Code's clarifying-question tool always lands here; the user answers in the UI.
+        const questions = Array.isArray((input as any).questions) ? ((input as any).questions as AskQuestion[]) : [];
+        const broker = c.questions ?? new QuestionBroker();
+        const d = await broker.request(questions, signal);
+        if (d.answered) return { behavior: "allow", updatedInput: { questions, answers: d.answers } };
+        return { behavior: "deny", message: d.reason ?? "The user did not answer; ask in prose instead." };
+      }
       const command = toolName === "Bash" ? commandFromToolInput(input) : "";
       const match = toolName === "Bash" ? matchGuardrail(command, rules) : null;
 

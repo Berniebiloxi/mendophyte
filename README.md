@@ -72,7 +72,11 @@ Then, in the browser:
 3. From there the agent follows the meta-prompt phase by phase. Anything
    it wants from you appears in **Your turn**; anything irreversible
    (commit, push, opening a PR) pauses in a confirmation modal with the
-   exact command.
+   exact command. When the agent uses Claude Code's `AskUserQuestion`
+   tool, the options show up as a card in **Your turn** and your picks go
+   back as the tool's answer (nothing is dismissed). When several items
+   are waiting, your answers go out as one message so the agent sees them
+   together instead of re-asking after each.
 
 Artifacts A–F are written to `~/.mendophyte/<repo-name>/`, never into
 your clone. Layouts, theme and terminal font size are remembered per
@@ -183,14 +187,17 @@ POST   /api/sessions/:id/end          finish the current turn and exit cleanly
 DELETE /api/sessions/:id              force-close and forget
 GET    /api/approvals                 guardrail commands waiting on a human
 POST   /api/approvals/:id             { approved, reason? }
+GET    /api/questions                 AskUserQuestion calls waiting on a human
+POST   /api/questions/:id             { answers: { "<question>": "label" | ["a","b"] } } or { dismiss: true }
 ```
 
 Socket frames on `/ws` (JSON, `type` field): `snapshot` on connect, then
 `session.created|updated|removed`, `session.event` (every orchestrator
 event: init, assistant_text, tool_use, turn with structured state, raw
 message, verification, artifacts, error, end), `approval.pending`,
-`approval.resolved`, `terminal.created|exit|closed`. Inbound the socket
-accepts `approval.resolve`, `session.send` and `replay`.
+`approval.resolved`, `question.pending`, `question.resolved`,
+`terminal.created|exit|closed`. Inbound the socket accepts
+`approval.resolve`, `question.answer`, `session.send` and `replay`.
 
 `/ws/terminal/:tid` carries one pty: binary frames are bytes both ways,
 text frames are JSON control (`resize`, `input` in; `hello`, `exit` out).

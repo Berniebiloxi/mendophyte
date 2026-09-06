@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { store, useActiveSession } from "../store.js";
+import { store, useActiveSession, useUi } from "../store.js";
+import type { QuestionAnswers, QuestionView } from "../types.js";
 
 const KIND_LABEL: Record<string, string> = {
   answer_question: "question",
@@ -16,35 +17,117 @@ const KIND_LABEL: Record<string, string> = {
 };
 
 /**
+ * The agent's clarifying questions (Claude Code's AskUserQuestion tool),
+ * rendered as options. The agent is blocked until this is submitted; all
+ * questions in one call are answered together.
+ */
+function QuestionCard({ q }: { q: QuestionView }) {
+  const [picked, setPicked] = useState<Record<string, string[]>>({});
+  const [other, setOther] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+
+  const toggle = (question: string, label: string, multi: boolean) =>
+    setPicked((p) => {
+      const cur = p[question] ?? [];
+      if (multi) return { ...p, [question]: cur.includes(label) ? cur.filter((x) => x !== label) : [...cur, label] };
+      return { ...p, [question]: [label] };
+    });
+
+  const answered = q.questions.every((x) => (picked[x.question]?.length ?? 0) > 0 || (other[x.question] ?? "").trim());
+
+  const submit = () => {
+    const answers: QuestionAnswers = {};
+    for (const x of q.questions) {
+      const free = (other[x.question] ?? "").trim();
+      const sel = picked[x.question] ?? [];
+      if (free) answers[x.question] = x.multiSelect && sel.length ? [...sel, free] : free;
+      else answers[x.question] = x.multiSelect ? sel : sel[0] ?? "";
+    }
+    setBusy(true);
+    store.answerQuestion(q.id, answers);
+  };
+
+  return (
+    <div className="yt-item yt-question">
+      <div className="row">
+        <span className="tag bloom">the agent asks</span>
+        <span className="faint">{q.questions.length} question{q.questions.length === 1 ? "" : "s"} · answer all, then send</span>
+      </div>
+      {q.questions.map((x) => (
+        <div key={x.question} style={{ margin: "8px 0" }}>
+          <div className="row" style={{ gap: 6 }}>
+            <span className="tag">{x.header}</span>
+            <b>{x.question}</b>
+          </div>
+          <div className="stack" style={{ gap: 4, marginTop: 6 }}>
+            {x.options.map((o) => {
+              const on = (picked[x.question] ?? []).includes(o.label);
+              return (
+                <label key={o.label} className={`yt-option${on ? " on" : ""}`}>
+                  <input type={x.multiSelect ? "checkbox" : "radio"} name={q.id + x.question} checked={on} onChange={() => toggle(x.question, o.label, x.multiSelect)} />
+                  <span>
+                    <b>{o.label}</b>
+                    {o.description && <span className="muted"> — {o.description}</span>}
+                  </span>
+                </label>
+              );
+            })}
+            <input type="text" value={other[x.question] ?? ""} onChange={(e) => setOther((s) => ({ ...s, [x.question]: e.target.value }))} placeholder="or type your own answer" />
+          </div>
+        </div>
+      ))}
+      <div className="row" style={{ justifyContent: "flex-end" }}>
+        <button className="btn primary sm" disabled={busy || !answered} onClick={submit}>Send answers</button>
+      </div>
+    </div>
+  );
+}
+
+/**
  * The "How This Splits Between Us" queue. Items come from the agent's
- * structured output, never from parsing prose. Answering sends a message
- * addressed to the item; the item stays visibly "answered" until the next
- * state replaces the list.
+ * structured output, never from parsing prose. When several items are
+ * pending, answers go out as ONE message so the agent sees them together.
  */
 export function YourTurnPanel() {
   const s = useActiveSession();
+  const { questions } = useUi();
   const items = s?.lastState?.your_turn_items ?? [];
+  const myQuestions = s ? questions.filter((q) => q.sessionId === s.id) : [];
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [answered, setAnswered] = useState<Set<string>>(new Set());
-  const [busy, setBusy] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   // A new state list means the previous answers were consumed.
   useEffect(() => {
     setAnswered(new Set());
   }, [s?.id, JSON.stringify(items.map((i) => i.id))]);
 
-  const submit = async (id: string, kind: string, prompt: string) => {
-    const text = (answers[id] ?? "").trim();
-    if (!text) return;
-    setBusy(id);
+  const open = items.filter((i) => !answered.has(i.id));
+  const filled = open.filter((i) => (answers[i.id] ?? "").trim());
+
+  const sendAll = async () => {
+    if (!filled.length) return;
+    setBusy(true);
     try {
-      await store.send(`Regarding "${prompt}" (${KIND_LABEL[kind] ?? kind}):\n\n${text}`);
-      setAnswered((a) => new Set(a).add(id));
-      setAnswers((a) => ({ ...a, [id]: "" }));
+      const text =
+        filled.length === 1
+          ? `Regarding "${filled[0].prompt}" (${KIND_LABEL[filled[0].kind] ?? filled[0].kind}):\n\n${answers[filled[0].id].trim()}`
+          : `Answers to your ${filled.length} open items, together:\n\n` + filled.map((i, n) => `${n + 1}. Regarding "${i.prompt}" (${KIND_LABEL[i.kind] ?? i.kind}):\n   ${answers[i.id].trim()}`).join("\n\n") + (open.length > filled.length ? `\n\n(${open.length - filled.length} item(s) left unanswered for now.)` : "");
+      await store.send(text);
+      setAnswered((a) => {
+        const n = new Set(a);
+        for (const i of filled) n.add(i.id);
+        return n;
+      });
+      setAnswers((a) => {
+        const n = { ...a };
+        for (const i of filled) delete n[i.id];
+        return n;
+      });
     } catch (e) {
       store.toast(e instanceof Error ? e.message : String(e));
     } finally {
-      setBusy(null);
+      setBusy(false);
     }
   };
 
@@ -52,7 +135,8 @@ export function YourTurnPanel() {
     <div className="panel stack">
       <h2>Your turn</h2>
       {!s && <div className="empty">No session.</div>}
-      {s && items.length === 0 && <div className="empty">Nothing is waiting on you. The agent can proceed.</div>}
+      {myQuestions.map((q) => <QuestionCard key={q.id} q={q} />)}
+      {s && items.length === 0 && myQuestions.length === 0 && <div className="empty">Nothing is waiting on you. The agent can proceed.</div>}
       {items.map((it) => {
         const done = answered.has(it.id);
         return (
@@ -64,26 +148,26 @@ export function YourTurnPanel() {
             </div>
             <div className="prompt">{it.prompt}</div>
             {!done && (
-              <>
-                <textarea
-                  value={answers[it.id] ?? ""}
-                  onChange={(e) => setAnswers((a) => ({ ...a, [it.id]: e.target.value }))}
-                  placeholder={it.kind === "confirm_go_ahead" ? "e.g. yes, go ahead / no, because…" : "Your answer, in your own words"}
-                  onKeyDown={(e) => {
-                    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") submit(it.id, it.kind, it.prompt);
-                  }}
-                />
-                <div className="row" style={{ justifyContent: "space-between" }}>
-                  <span className="faint">⌘/Ctrl+Enter to send</span>
-                  <button className="btn primary sm" disabled={busy === it.id || !(answers[it.id] ?? "").trim()} onClick={() => submit(it.id, it.kind, it.prompt)}>
-                    Submit
-                  </button>
-                </div>
-              </>
+              <textarea
+                value={answers[it.id] ?? ""}
+                onChange={(e) => setAnswers((a) => ({ ...a, [it.id]: e.target.value }))}
+                placeholder={it.kind === "confirm_go_ahead" ? "e.g. yes, go ahead / no, because…" : "Your answer, in your own words"}
+                onKeyDown={(e) => {
+                  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") sendAll();
+                }}
+              />
             )}
           </div>
         );
       })}
+      {open.length > 0 && (
+        <div className="row" style={{ justifyContent: "space-between" }}>
+          <span className="faint">{open.length > 1 ? "All answers go in one message so the agent sees them together. " : ""}⌘/Ctrl+Enter to send</span>
+          <button className="btn primary sm" disabled={busy || !filled.length} onClick={sendAll}>
+            {open.length > 1 ? `Send ${filled.length} of ${open.length} answers` : "Submit"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

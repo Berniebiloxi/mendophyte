@@ -176,6 +176,25 @@ test("server bridge: REST + websocket round trip with a fake session", async () 
     await next((m) => m.type === "approval.resolved" && m.approval.id === pending2.approval.id);
     assert.deepEqual(await attempt2, { ran: true });
 
+    // AskUserQuestion: the fake asks through the broker; the UI answers over the socket; REST lists/answers too.
+    const ask = fakes[0].config.questions!.request([{ question: "Tea or coffee?", header: "Drink", multiSelect: false, options: [{ label: "Tea", description: "" }, { label: "Coffee", description: "" }] }]);
+    const qp = await next((m) => m.type === "question.pending");
+    assert.equal(qp.question.sessionId, id);
+    assert.equal(qp.question.questions[0].header, "Drink");
+    assert.equal((await api("GET", "/questions")).json.questions.length, 1);
+    assert.equal((await api("GET", `/sessions/${id}`)).json.session.pendingQuestions, 1);
+    ws.send(JSON.stringify({ type: "question.answer", id: qp.question.id, answers: { "Tea or coffee?": "Tea" } }));
+    const qr = await next((m) => m.type === "question.resolved" && m.question.id === qp.question.id);
+    assert.equal(qr.answered, true);
+    const decision = await ask;
+    assert.deepEqual(decision, { answered: true, answers: { "Tea or coffee?": "Tea" } });
+    const ask2 = fakes[0].config.questions!.request([{ question: "Which?", header: "Pick", multiSelect: true, options: [{ label: "A", description: "" }, { label: "B", description: "" }] }]);
+    const qp2 = await next((m) => m.type === "question.pending");
+    assert.equal((await api("POST", `/questions/${qp2.question.id}`, { answers: { "Which?": ["A", "B"] } })).status, 200);
+    assert.deepEqual((await ask2 as any).answers, { "Which?": ["A", "B"] });
+    assert.equal((await api("POST", "/questions/nope", { answers: {} })).status, 404);
+    assert.equal((await api("POST", "/questions/nope", {})).status, 400);
+
     // Unknown approval id over the socket -> error frame, nothing thrown.
     ws.send(JSON.stringify({ type: "approval.resolve", id: "nope", approved: true }));
     const err = await next((m) => m.type === "error");

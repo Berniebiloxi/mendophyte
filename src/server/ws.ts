@@ -56,12 +56,14 @@ export function attachWebSockets(server: HttpServer, manager: SessionManager, te
   manager.on("session.event", (e) => broadcast({ type: "session.event", ...e }));
   manager.on("approval.pending", (approval) => broadcast({ type: "approval.pending", approval }));
   manager.on("approval.resolved", (approval, decision) => broadcast({ type: "approval.resolved", approval, decision }));
+  manager.on("question.pending", (question) => broadcast({ type: "question.pending", question }));
+  manager.on("question.resolved", (question, answered) => broadcast({ type: "question.resolved", question, answered }));
   terminals.on("created", (t) => broadcast({ type: "terminal.created", terminal: t }));
   terminals.on("exit", (t) => broadcast({ type: "terminal.exit", terminal: t }));
   terminals.on("closed", (t) => broadcast({ type: "terminal.closed", terminal: t }));
 
   hub.on("connection", (socket: WebSocket) => {
-    socket.send(JSON.stringify({ type: "snapshot", sessions: manager.list(), approvals: manager.pendingApprovals(), terminals: terminals.list() }));
+    socket.send(JSON.stringify({ type: "snapshot", sessions: manager.list(), approvals: manager.pendingApprovals(), questions: manager.pendingQuestions(), terminals: terminals.list() }));
 
     socket.on("message", (raw) => {
       let msg: any;
@@ -81,6 +83,14 @@ export function attachWebSockets(server: HttpServer, manager: SessionManager, te
             }
             return;
           }
+          case "question.answer":
+            if (!manager.answerQuestion(String(msg.id), msg.answers ?? {})) {
+              socket.send(JSON.stringify({ type: "error", message: `no pending question ${msg.id}`, inReplyTo: msg.type }));
+            }
+            return;
+          case "question.dismiss":
+            manager.dismissQuestion(String(msg.id), typeof msg.reason === "string" ? msg.reason : undefined);
+            return;
           case "session.send":
             manager.send(String(msg.sessionId), String(msg.text ?? ""));
             return;

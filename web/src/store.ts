@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { api } from "./api.js";
-import type { AnyEvent, ApprovalView, DetectionReport, SchemeName, SessionEvent, SessionSummary, ThemeName, VerificationProgress, VerificationRun } from "./types.js";
+import type { AnyEvent, ApprovalView, DetectionReport, QuestionAnswers, QuestionView, SchemeName, SessionEvent, SessionSummary, ThemeName, VerificationProgress, VerificationRun } from "./types.js";
 
 /**
  * One small store for the whole UI: sessions, the active one, per-session
@@ -21,6 +21,8 @@ export interface UiState {
   sessions: SessionSummary[];
   activeSessionId: string | null;
   approvals: ApprovalView[];
+  /** AskUserQuestion calls waiting for answers. */
+  questions: QuestionView[];
   events: Record<string, AnyEvent[]>;
   verification: Record<string, VerificationState>;
   theme: ThemeName;
@@ -45,6 +47,7 @@ class Store {
       sessions: [],
       activeSessionId: safeGet(LS.active),
       approvals: [],
+      questions: [],
       events: {},
       verification: {},
       theme: (safeGet(LS.theme) as ThemeName) || "vine",
@@ -186,6 +189,11 @@ class Store {
     if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(msg));
   }
 
+  answerQuestion(id: string, answers: QuestionAnswers) {
+    this.wsSend({ type: "question.answer", id, answers });
+    this.set((st) => ({ questions: st.questions.filter((q) => q.id !== id) }));
+  }
+
   resolveApproval(id: string, approved: boolean, reason?: string) {
     this.wsSend({ type: "approval.resolve", id, approved, reason });
     // optimistic removal; the server's approval.resolved frame confirms it
@@ -219,7 +227,7 @@ class Store {
           const sessions: SessionSummary[] = m.sessions ?? [];
           let active = this.state.activeSessionId;
           if (!active || !sessions.some((s) => s.id === active)) active = sessions.find((s) => s.status === "running")?.id ?? sessions[0]?.id ?? null;
-          this.set({ sessions, approvals: m.approvals ?? [], activeSessionId: active });
+          this.set({ sessions, approvals: m.approvals ?? [], questions: m.questions ?? [], activeSessionId: active });
           if (active) this.ensureReplayed(active);
           return;
         }
@@ -244,6 +252,12 @@ class Store {
           return;
         case "approval.resolved":
           this.set((st) => ({ approvals: st.approvals.filter((a) => a.id !== m.approval.id) }));
+          return;
+        case "question.pending":
+          this.set((st) => (st.questions.some((q) => q.id === m.question.id) ? {} : { questions: [...st.questions, m.question] }));
+          return;
+        case "question.resolved":
+          this.set((st) => ({ questions: st.questions.filter((q) => q.id !== m.question.id) }));
           return;
         case "error":
           this.toast(m.message);

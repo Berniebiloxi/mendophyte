@@ -9,6 +9,9 @@ import { listArtifactHome, type ArtifactEntry } from "../orchestrator/preflight/
 
 import {
   ApprovalBroker,
+  QuestionBroker,
+  type QuestionAnswers,
+  type QuestionRequest,
   MendophyteSession,
   buildKickoffMessage,
   defaultPromptDir,
@@ -66,6 +69,8 @@ export interface SessionSummary {
   /** The most recent structured state that carried triage, kept after the phase moves on. */
   lastTriage: Triage | null;
   pendingApprovals: number;
+  /** AskUserQuestion calls waiting for the user in the UI. */
+  pendingQuestions: number;
   lastError: string | null;
   preflight: PreflightSummary | null;
 }
@@ -109,6 +114,10 @@ export interface ApprovalView extends ApprovalRequest {
   sessionId: string;
 }
 
+export interface QuestionView extends QuestionRequest {
+  sessionId: string;
+}
+
 export interface CreateSessionInput {
   repoDir: string;
   artifactHome?: string;
@@ -133,12 +142,15 @@ export interface ManagerEvents {
   "session.event": (e: SessionEvent) => void;
   "approval.pending": (a: ApprovalView) => void;
   "approval.resolved": (a: ApprovalView, decision: ApprovalDecision) => void;
+  "question.pending": (q: QuestionView) => void;
+  "question.resolved": (q: QuestionView, answered: boolean) => void;
 }
 
 interface Entry {
   summary: SessionSummary;
   session: SessionLike;
   broker: ApprovalBroker;
+  questions: QuestionBroker;
   events: SessionEvent[];
   seq: number;
   preflightFacts: string | null;
@@ -295,6 +307,22 @@ export class SessionManager extends EventEmitter {
     return false;
   }
 
+  pendingQuestions(): QuestionView[] {
+    const out: QuestionView[] = [];
+    for (const [id, e] of this.entries) for (const q of e.questions.pending()) out.push({ ...q, sessionId: id });
+    return out;
+  }
+
+  answerQuestion(questionId: string, answers: QuestionAnswers): boolean {
+    for (const e of this.entries.values()) if (e.questions.answer(questionId, answers)) return true;
+    return false;
+  }
+
+  dismissQuestion(questionId: string, reason?: string): boolean {
+    for (const e of this.entries.values()) if (e.questions.dismiss(questionId, reason)) return true;
+    return false;
+  }
+
   async create(input: CreateSessionInput): Promise<SessionSummary> {
     const repoDir = path.resolve(input.repoDir);
     await assertRepoDir(repoDir, input.allowNonGit);
@@ -314,11 +342,13 @@ export class SessionManager extends EventEmitter {
     }
 
     const broker = new ApprovalBroker();
+    const questions = new QuestionBroker();
     const config: SessionConfig = {
       repoDir,
       artifactHome,
       promptDir,
       approvals: broker,
+      questions,
       model,
       maxTurns: input.maxTurns,
     };
@@ -336,6 +366,7 @@ export class SessionManager extends EventEmitter {
       lastState: null,
       lastTriage: null,
       pendingApprovals: 0,
+      pendingQuestions: 0,
       lastError: null,
       preflight: report
         ? {
@@ -347,7 +378,7 @@ export class SessionManager extends EventEmitter {
           }
         : null,
     };
-    const entry: Entry = { summary, session, broker, events: [], seq: 0, preflightFacts: facts, report, fragility: null, verificationDetected: null, verificationRuns: [], watcher: null, watchTimer: null, submission: null, submissionTimer: null, submissionIntervalSec: null, submissionBusy: false };
+    const entry: Entry = { summary, session, broker, questions, events: [], seq: 0, preflightFacts: facts, report, fragility: null, verificationDetected: null, verificationRuns: [], watcher: null, watchTimer: null, submission: null, submissionTimer: null, submissionIntervalSec: null, submissionBusy: false };
     this.entries.set(id, entry);
     this.wire(entry);
     this.watchArtifacts(entry);
@@ -389,6 +420,7 @@ export class SessionManager extends EventEmitter {
     if (e.submissionTimer) clearInterval(e.submissionTimer);
     e.session.close();
     e.broker.denyAll("Session removed.");
+    e.questions.dismissAll("Session removed.");
     this.entries.delete(id);
     this.emit("session.removed", id);
     return true;
@@ -449,7 +481,7 @@ export class SessionManager extends EventEmitter {
   }
 
   private wire(entry: Entry): void {
-    const { session, broker, summary } = entry;
+    const { session, broker, questions, summary } = entry;
     const updated = () => this.emit("session.updated", summary);
 
     session.on("init", (info: { sessionId: string; model: string; permissionMode: string; tools: string[] }) => {
@@ -520,6 +552,16 @@ export class SessionManager extends EventEmitter {
     broker.on("resolved", (req, decision) => {
       summary.pendingApprovals = broker.pending().length;
       this.emit("approval.resolved", { ...req, sessionId: summary.id }, decision);
+      updated();
+    });
+    questions.on("pending", (req: QuestionRequest) => {
+      summary.pendingQuestions = questions.pending().length;
+      this.emit("question.pending", { ...req, sessionId: summary.id });
+      updated();
+    });
+    questions.on("resolved", (req: QuestionRequest, d: { answered: boolean }) => {
+      summary.pendingQuestions = questions.pending().length;
+      this.emit("question.resolved", { ...req, sessionId: summary.id }, d.answered);
       updated();
     });
   }

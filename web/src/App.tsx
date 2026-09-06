@@ -57,7 +57,7 @@ export function App() {
   const [api, setApi] = useState<DockviewApi | null>(null);
   const saveTimer = useRef<number | null>(null);
   const colorScheme = useColorScheme();
-  const { toast, approvals } = useUi();
+  const { toast, approvals, questions } = useUi();
 
   const theme: DockviewTheme = useMemo(
     () => ({ name: "mendophyte", className: "dockview-theme-mendophyte", colorScheme, gap: 4, dndOverlayMounting: "absolute", dndPanelOverlay: "group" }),
@@ -75,8 +75,9 @@ export function App() {
 
   useEffect(() => {
     const base = "Mendophyte";
-    document.title = approvals.length ? `(${approvals.length}) confirm · ${base}` : base;
-  }, [approvals.length]);
+    const n = approvals.length + questions.length;
+    document.title = n ? `(${n}) your turn · ${base}` : base;
+  }, [approvals.length, questions.length]);
 
   return (
     <div className="app">

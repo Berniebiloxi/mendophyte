@@ -29,7 +29,7 @@ function Menu({ label, children }: { label: string; children: (close: () => void
 }
 
 export function Menubar({ api }: { api: DockviewApi | null }) {
-  const { connected, approvals, theme, scheme, termFontSize } = useUi();
+  const { connected, approvals, questions, theme, scheme, termFontSize } = useUi();
   const active = useActiveSession();
   const [layouts, setLayouts] = useState<string[]>(() => Object.keys(namedLayouts()));
   const refreshLayouts = () => setLayouts(Object.keys(namedLayouts()));
@@ -113,6 +113,7 @@ export function Menubar({ api }: { api: DockviewApi | null }) {
 
       <div className="menubar-status">
         {approvals.length > 0 && <span className="attention">{approvals.length} awaiting your confirmation</span>}
+        {questions.length > 0 && <span className="attention" style={{ background: "var(--m-bloom)" }}>{questions.length} question{questions.length === 1 ? "" : "s"} for you</span>}
         {active && (
           <span title={active.repoDir}>
             {active.repoDir.split(/[\\/]/).pop()} · {active.status}

@@ -8,8 +8,13 @@ export {
 } from "./session.js";
 export {
   ApprovalBroker,
+  QuestionBroker,
   type ApprovalDecision,
   type ApprovalRequest,
+  type AskQuestion,
+  type QuestionRequest,
+  type QuestionAnswers,
+  type QuestionDecision,
 } from "./approvals.js";
 export {
   DEFAULT_GUARDRAIL_RULES,

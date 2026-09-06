@@ -115,3 +115,79 @@ export class ApprovalBroker extends EventEmitter {
     return super.once(event, listener);
   }
 }
+
+// ---- AskUserQuestion routed to the UI --------------------------------------
+
+/** One question as Claude Code's AskUserQuestion tool poses it. */
+export interface AskQuestion {
+  question: string;
+  header: string;
+  options: { label: string; description: string; preview?: string }[];
+  multiSelect: boolean;
+}
+
+export interface QuestionRequest {
+  id: string;
+  questions: AskQuestion[];
+  createdAt: string;
+}
+
+/** Answers keyed by question text; a free-text answer is just a string that isn't an option label. */
+export type QuestionAnswers = Record<string, string | string[]>;
+
+export type QuestionDecision = { answered: true; answers: QuestionAnswers } | { answered: false; reason?: string };
+
+/**
+ * Same shape as the approval broker, for the agent's clarifying questions:
+ * the UI shows the options, the agent is blocked until the user answers.
+ * Fail-closed: with nobody listening, the question is declined with a
+ * message telling the agent to ask in prose instead.
+ */
+export class QuestionBroker extends EventEmitter {
+  private open = new Map<string, { req: QuestionRequest; settle: (d: QuestionDecision) => void }>();
+
+  pending(): QuestionRequest[] {
+    return [...this.open.values()].map((e) => e.req);
+  }
+
+  request(questions: AskQuestion[], signal?: AbortSignal): Promise<QuestionDecision> {
+    const req: QuestionRequest = { id: randomUUID(), questions, createdAt: new Date().toISOString() };
+    if (this.listenerCount("pending") === 0) {
+      const d: QuestionDecision = { answered: false, reason: "No UI is attached to answer questions; ask in prose and list the options in your reply." };
+      queueMicrotask(() => this.emit("resolved", req, d));
+      return Promise.resolve(d);
+    }
+    return new Promise<QuestionDecision>((resolve) => {
+      const settle = (d: QuestionDecision) => {
+        if (!this.open.has(req.id)) return;
+        this.open.delete(req.id);
+        signal?.removeEventListener("abort", onAbort);
+        this.emit("resolved", req, d);
+        resolve(d);
+      };
+      const onAbort = () => settle({ answered: false, reason: "The session was interrupted before an answer was given." });
+      this.open.set(req.id, { req, settle });
+      if (signal?.aborted) return onAbort();
+      signal?.addEventListener("abort", onAbort, { once: true });
+      this.emit("pending", req);
+    });
+  }
+
+  answer(id: string, answers: QuestionAnswers): boolean {
+    const e = this.open.get(id);
+    if (!e) return false;
+    e.settle({ answered: true, answers });
+    return true;
+  }
+
+  dismiss(id: string, reason?: string): boolean {
+    const e = this.open.get(id);
+    if (!e) return false;
+    e.settle({ answered: false, reason });
+    return true;
+  }
+
+  dismissAll(reason = "Session closed."): void {
+    for (const { settle } of [...this.open.values()]) settle({ answered: false, reason });
+  }
+}

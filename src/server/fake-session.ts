@@ -76,10 +76,32 @@ export class FakeSession extends EventEmitter implements SessionLike {
         this.say("I've read 00-entry.md and the pre-flight facts you handed me. Before anything else, two gating questions, one at a time.\n\n**How much experience do you have reading other people's code?** None, Some, or Experienced.");
         this.state({ phase: 0, phase_complete: false, your_turn_items: [{ id: "experience_level", kind: "answer_question", prompt: "How much experience do you have reading other people's code? (None / Some / Experienced)", blocks: "none" }] });
         return;
-      case 1:
-        this.say(`Noted: ${text.split("\n").pop()}. Second question.\n\n**What do you want to do here?** 1) a specific bug in mind, 2) find me something, 3) just understand the codebase.`);
-        this.state({ phase: 0, phase_complete: false, your_turn_items: [{ id: "session_type", kind: "answer_question", prompt: "What do you want to do here? (1 specific bug / 2 find something / 3 just understand)", blocks: "none" }] });
+      case 1: {
+        this.say(`Noted: ${text.split("\n").pop()}. Second question, as a card this time.`);
+        this.tool("AskUserQuestion", { questions: [{ question: "What do you want to do here?", header: "Session" }] });
+        const q = this.config.questions;
+        const d = q
+          ? await q.request([
+              {
+                question: "What do you want to do here?",
+                header: "Session",
+                multiSelect: false,
+                options: [
+                  { label: "Specific bug", description: "I have an issue in mind and will point you to it" },
+                  { label: "Find me something", description: "Scan open issues and suggest candidates" },
+                  { label: "Just understand", description: "Pure orientation, no fix intended" },
+                ],
+              },
+            ])
+          : { answered: false as const, reason: "no UI" };
+        const pick = d.answered ? String(d.answers["What do you want to do here?"]) : "(no answer)";
+        this.say(`Session type: ${pick}.`);
+        this.state({ phase: 0, phase_complete: true, your_turn_items: [] });
+        // the fake proceeds on its own; a real agent would go to Phase 1 here
+        this.step = 3; // the next user message lands on step 3 (a triage pick)
+        setTimeout(() => void this.script(2, pick), 300);
         return;
+      }
       case 2:
         this.say("Thanks. Phase 0 is done; moving to Phase 1 and reading 01-recon.md.");
         this.tool("Read", { file_path: `${this.config.promptDir}/01-recon.md` });

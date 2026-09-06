@@ -455,6 +455,19 @@ export function apiRoutes(manager: SessionManager, terminals: TerminalManager): 
   // ---- approvals
   r.get("/approvals", (_req, res) => res.json({ approvals: manager.pendingApprovals() }));
 
+  // ---- AskUserQuestion answers
+  r.get("/questions", (_req, res) => res.json({ questions: manager.pendingQuestions() }));
+  r.post("/questions/:id", (req, res) => {
+    const b = req.body ?? {};
+    if (b.dismiss === true) {
+      if (!manager.dismissQuestion(req.params.id, typeof b.reason === "string" ? b.reason : undefined)) return res.status(404).json({ error: "no such pending question" });
+      return res.json({ ok: true });
+    }
+    if (!b.answers || typeof b.answers !== "object") return res.status(400).json({ error: "answers (object keyed by question text) is required" });
+    if (!manager.answerQuestion(req.params.id, b.answers)) return res.status(404).json({ error: "no such pending question" });
+    res.json({ ok: true });
+  });
+
   r.post("/approvals/:id", (req, res) => {
     const b = req.body ?? {};
     if (typeof b.approved !== "boolean") return res.status(400).json({ error: "approved (boolean) is required" });
