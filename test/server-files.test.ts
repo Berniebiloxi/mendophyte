@@ -40,7 +40,9 @@ test("server: files, file viewer, artifact files and the artifact watcher", { ti
   await writeFile(path.join(repoDir, "README.md"), "# hi\n");
   await writeFile(path.join(repoDir, "src", "a.ts"), "export const a = 1;\n// TODO x\n");
   await writeFile(path.join(repoDir, "src", "bin.dat"), Buffer.from([0, 1, 2, 3]));
-  await symlink(outside, path.join(repoDir, "leak.txt"));
+  // Symlinks need elevated rights on Windows; the escape check is POSIX-only there.
+  const canSymlink = process.platform !== "win32";
+  if (canSymlink) await symlink(outside, path.join(repoDir, "leak.txt"));
   const git = (...a: string[]) => execFileSync("git", a, { cwd: repoDir, stdio: "pipe" });
   git("init", "-q", "-b", "main");
   git("config", "user.email", "t@example.com");
@@ -68,7 +70,7 @@ test("server: files, file viewer, artifact files and the artifact watcher", { ti
     const plain = await api(`/sessions/${id}/files`);
     assert.equal(plain.status, 200);
     const paths = plain.json.listing.files.map((f: any) => f.path).sort();
-    assert.deepEqual(paths, ["README.md", "leak.txt", "src/a.ts", "src/bin.dat", "untracked.txt"]);
+    assert.deepEqual(paths, [...(canSymlink ? ["README.md", "leak.txt"] : ["README.md"]), "src/a.ts", "src/bin.dat", "untracked.txt"]);
     assert.equal(plain.json.listing.fragilityWindow, null);
     assert.equal(plain.json.listing.files[0].heat, undefined);
 
@@ -92,7 +94,7 @@ test("server: files, file viewer, artifact files and the artifact watcher", { ti
     assert.equal(bin.json.file.binary, true);
     assert.equal(bin.json.file.content, "");
     assert.equal((await api(`/sessions/${id}/file?path=../secret.txt`)).status, 400);
-    assert.equal((await api(`/sessions/${id}/file?path=leak.txt`)).status, 400, "symlink out of the repo is refused");
+    if (canSymlink) assert.equal((await api(`/sessions/${id}/file?path=leak.txt`)).status, 400, "symlink out of the repo is refused");
     assert.equal((await api(`/sessions/${id}/file?path=nope.txt`)).status, 404);
     assert.equal((await api(`/sessions/${id}/file?path=src`)).status, 400);
     assert.equal((await api(`/sessions/${id}/file?path=`)).status, 400);

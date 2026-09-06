@@ -1,5 +1,7 @@
 # mendophyte
 
+[![CI](https://github.com/Berniebiloxi/mendophyte/actions/workflows/ci.yml/badge.svg)](https://github.com/Berniebiloxi/mendophyte/actions/workflows/ci.yml)
+
 Local dev cockpit for AI-assisted open-source contribution work, built on
 the Claude Agent SDK. Runs entirely on your own machine against your own
 local Claude Code setup — no hosting, no account, no server to stand up.

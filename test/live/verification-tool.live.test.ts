@@ -7,6 +7,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 
@@ -14,7 +15,7 @@ import { ApprovalBroker, DETECT_VERIFICATION_TOOL, MendophyteSession, RUN_VERIFI
 
 const LIVE = process.env.MENDOPHYTE_LIVE === "1";
 const MODEL = process.env.MENDOPHYTE_TEST_MODEL ?? "haiku";
-const root = path.resolve(new URL(".", import.meta.url).pathname, "../..");
+const root = path.resolve(fileURLToPath(new URL(".", import.meta.url)), "../..");
 
 test("live: agent runs verification through the tool and reports the real outcome", { skip: !LIVE, timeout: 300_000 }, async () => {
   const base = await mkdtemp(path.join(os.tmpdir(), "mendophyte-verify-live-"));

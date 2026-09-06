@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { readFile } from "node:fs/promises";
 import {
   buildAppendSystemPrompt,
@@ -8,7 +9,7 @@ import {
   loadPersistentSections,
 } from "../src/orchestrator/entry-sections.js";
 
-const root = path.resolve(new URL(".", import.meta.url).pathname, "..");
+const root = path.resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
 const promptDir = path.join(root, "prompts");
 
 test("extracts exactly the three persistent sections from the real 00-entry.md", async () => {
