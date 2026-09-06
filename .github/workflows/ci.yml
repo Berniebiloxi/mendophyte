@@ -16,8 +16,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
         node: [20, 22]
+        exclude:
+          # one Windows leg is enough; the pty test is skipped there anyway
+          - os: windows-latest
+            node: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -29,19 +33,5 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - name: Built artefacts exist
+        shell: bash
         run: test -f dist/cli.js && test -f public/index.html && test -f prompts/00-entry.md
-
-  # Windows is untested by the maintainers so far; report, don't block.
-  windows:
-    name: windows-latest · node 22 (advisory)
-    runs-on: windows-latest
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm test

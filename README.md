@@ -95,6 +95,9 @@ MENDOPHYTE_FAKE_SESSION=1 npm start
 - **"Port 4317 is already in use":** pass `--port`.
 - **Starting Mendophyte from inside a Claude Code terminal:** works; the
   nesting guard is stripped for the sessions Mendophyte spawns.
+- **Platforms:** CI runs the build, type-check and unit suite on Linux,
+  macOS and Windows. The terminal panel's pty test is exercised on Linux
+  and macOS only; on Windows the panel itself is not yet hand-tested.
 
 ## Developing the UI
 
