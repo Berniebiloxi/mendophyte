@@ -105,12 +105,16 @@ export function SpinePanel() {
     };
   }, []);
   const labelW = (i: number, t: string) => labelWidths[i] || t.length * 6.4;
+  // Bud x for phase i, bud k: after the label, or at least a fixed column, so rows line up when labels are short.
+  const budX = (i: number, k: number) => Math.max(x(i) + 16 + labelW(i, `${PHASES[i].n} · ${PHASES[i].name}`) + 22, x(i) + 120) + k * 22;
+  const rightEdge = Math.max(...PHASES.map((p, i) => budX(i, Math.max(0, p.buds.length - 1)) + 12));
+  const viewW = Math.max(W, Math.ceil(rightEdge));
 
   return (
     <div className="panel spine">
       <h2>Progress</h2>
       {!s && <div className="empty">Start a session and the vine starts growing.</div>}
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={s ? `Phase ${phase ?? "not started"}` : "no session"}>
+      <svg viewBox={`0 0 ${viewW} ${H}`} role="img" aria-label={s ? `Phase ${phase ?? "not started"}` : "no session"}>
         <path className="vine-path" d={d} />
         <path className="vine-grown" d={d} pathLength={total} strokeDasharray={`${grownFrac * total} ${total}`} />
         {(flowing !== null || (working && phase === null)) && s?.status === "running" && (
@@ -146,12 +150,14 @@ export function SpinePanel() {
                 </g>
               )}
               {p.buds.map((b, k) => {
-                const bx = Math.max(labelEnd + 14, x(i) + 120) + k * 22;
-                const by = y(i) - 2;
+                const bx = budX(i, k);
+                // Buds sit on the node's own centre line, so the connector is exactly horizontal:
+                // a 1px stroke that never scales (crisp dashes at any panel width).
+                const by = y(i);
                 const open = buds.has(b);
                 return (
                   <g key={b}>
-                    <line x1={k === 0 ? labelEnd : bx - 22 + 5} y1={k === 0 ? y(i) : by} x2={bx - 6} y2={by} stroke="var(--m-vine-dormant)" strokeWidth={1} strokeDasharray={open ? undefined : "2 3"} />
+                    <line className={`bud-link${open ? " open" : ""}`} x1={k === 0 ? labelEnd : bx - 22 + 5} y1={by} x2={bx - 6} y2={by} vectorEffect="non-scaling-stroke" shapeRendering="crispEdges" />
                     <circle className={`bud${open ? " open" : ""}`} cx={bx} cy={by} r={4.5}>
                       <title>
                         Artifact {b} · {ARTIFACT_NAMES[b]} {open ? "(present)" : "(not yet)"}

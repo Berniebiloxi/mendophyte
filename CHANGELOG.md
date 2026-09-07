@@ -5,6 +5,13 @@ batch of user-visible changes, the patch number with fixes only. The
 number lives in package.json and is read from there everywhere
 (health endpoint, SDK client string, MCP server, About box).
 
+## 0.6.3 — 2026-09-07
+
+- Progress tree: bud connectors are exactly horizontal with a crisp
+  non-scaling 1px stroke (they ran at a two-unit slope and anti-aliased
+  into steps), and the drawing widens to its widest row so no bud is
+  clipped at the edge.
+
 ## 0.6.2 — 2026-09-07
 
 - The send-shortcut hint says Ctrl+Enter on Windows and Linux, ⌘+Enter

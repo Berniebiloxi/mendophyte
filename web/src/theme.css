@@ -419,6 +419,8 @@ details > summary { cursor: pointer; color: var(--m-ink-2); }
 .spine .leaf { fill: var(--m-accent-2); opacity: 0.85; }
 .spine .leaf.dormant { fill: var(--m-vine-dormant); opacity: 0.6; }
 .spine .bud { fill: var(--m-panel); stroke: var(--m-bloom); stroke-width: 1.5; }
+.spine .bud-link { stroke: var(--m-vine-dormant); stroke-width: 1px; stroke-dasharray: 2 3; }
+.spine .bud-link.open { stroke-dasharray: none; }
 .spine .bud.open { fill: var(--m-bloom); }
 .spine .label { font-size: 0.75rem; fill: var(--m-ink); font-family: var(--m-font-serif); }
 .spine .label.dim { fill: var(--m-ink-3); }
