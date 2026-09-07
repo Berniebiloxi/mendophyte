@@ -5,7 +5,7 @@ import { PANELS, PRESETS, applyPreset, loadNamedLayout, namedLayouts, newTermina
 import { OpenProjectDialog } from "./dialogs/OpenProjectDialog.js";
 import { LayoutsDialog } from "./dialogs/LayoutsDialog.js";
 import { api as rest } from "./api.js";
-import { UI_SCALE_STEPS, autoUiScale, store, useActiveSession, useUi } from "./store.js";
+import { UI_SCALE_STEPS, autoUiScale, effectiveFonts, isWindows, store, useActiveSession, useUi } from "./store.js";
 import { diag } from "./diag.js";
 
 /** A checkmark that does not depend on the system font having the glyph. */
@@ -87,6 +87,7 @@ export function Menubar({ api }: { api: DockviewApi | null }) {
   const termFontSize = useUi((st) => st.termFontSize);
   const uiScale = useUi((st) => st.uiScale);
   const followPhase = useUi((st) => st.layoutFollowsPhase);
+  const fonts = useUi((st) => st.fonts);
   // Integer device pixel ratios are OS scaling; anything else means the browser's own zoom is on.
   const dpr = window.devicePixelRatio || 1;
   const browserZoom = Number.isInteger(dpr) ? null : `${Math.round(dpr * 100)}%`;
@@ -199,13 +200,17 @@ export function Menubar({ api }: { api: DockviewApi | null }) {
               ))}
               <button onClick={() => { setDialog("layouts"); close(); }}>Manage layouts… <span className="kbd">save, rename, delete</span></button>
             </SubMenu>
-            <SubMenu label="Appearance" hint={`${theme} · ${scheme}`}>
+            <SubMenu label="Appearance" hint={`${theme} · ${scheme} · ${effectiveFonts(fonts)} fonts`}>
               <button onClick={() => { store.setTheme("vine"); close(); }}><span><Check on={theme === "vine"} />Theme: Vine</span></button>
               <button onClick={() => { store.setTheme("minimal"); close(); }}><span><Check on={theme === "minimal"} />Theme: Minimal</span></button>
               <hr />
               {(["auto", "light", "dark"] as const).map((s) => (
                 <button key={s} onClick={() => { store.setScheme(s); close(); }}><span><Check on={scheme === s} />Scheme: {s}</span></button>
               ))}
+              <hr />
+              <button onClick={() => { store.setFonts("auto"); close(); }}><span><Check on={fonts === "auto"} />Fonts: auto</span> <span className="kbd">{isWindows() ? "bundled on Windows" : "system here"}</span></button>
+              <button onClick={() => { store.setFonts("system"); close(); }}><span><Check on={fonts === "system"} />Fonts: this computer's</span></button>
+              <button onClick={() => { store.setFonts("bundled"); close(); }}><span><Check on={fonts === "bundled"} />Fonts: bundled</span> <span className="kbd">Inter · Source Serif · JetBrains Mono</span></button>
             </SubMenu>
             <SubMenu label="UI size" hint={`${uiScale === "auto" ? `auto · ${Math.round(autoUiScale() * 100)}%` : `${Math.round(uiScale * 100)}%`}${browserZoom ? ` · zoom ${browserZoom}` : ""}`}>
               {browserZoom && (

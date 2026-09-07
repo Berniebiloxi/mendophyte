@@ -158,6 +158,11 @@ agent asks questions (AskUserQuestion keeps the turn open). The tree also
 follows the agent reading `prompts/0N-*.md`, so it advances the moment
 the agent opens the next phase's prompt.
 
+**Fonts.** On Windows the app uses bundled fonts (Inter, Source Serif 4,
+JetBrains Mono) so it looks like it does on macOS and Linux; elsewhere it
+uses the system's. **View → Appearance → Fonts** picks auto, this
+computer's, or bundled on any platform.
+
 **UI size.** Everything scales from one number: **View → UI size**.
 "Auto" picks a size from the screen the window is on (100% on laptops,
 110–130% on wide desktop monitors) and follows the window between

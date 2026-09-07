@@ -37,6 +37,7 @@ export function TerminalPanel(props: IDockviewPanelProps<{ termId?: string }>) {
   const theme = useUi((st) => st.theme);
   const scheme = useUi((st) => st.scheme);
   const termFontSize = useUi((st) => st.termFontSize);
+  const fonts = useUi((st) => st.fonts);
   const host = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
@@ -69,6 +70,8 @@ export function TerminalPanel(props: IDockviewPanelProps<{ termId?: string }>) {
     } catch {
       /* not laid out yet */
     }
+    // Bundled fonts may finish loading after the terminal measured its cells.
+    document.fonts?.ready.then(() => { if (!disposed) try { fit.fit(); } catch { /* ignore */ } });
 
     const connect = async () => {
       let id = termId;
@@ -192,12 +195,13 @@ export function TerminalPanel(props: IDockviewPanelProps<{ termId?: string }>) {
     if (!t) return;
     t.options.theme = xtermTheme(isDark());
     t.options.fontSize = termFontSize;
+    t.options.fontFamily = css("--m-font-mono") || "monospace";
     try {
       fitRef.current?.fit();
     } catch {
       /* ignore */
     }
-  }, [theme, scheme, termFontSize]);
+  }, [theme, scheme, termFontSize, fonts]);
 
   const kill = async () => {
     if (!sessionAtMount.current || !termId) return props.api.close();

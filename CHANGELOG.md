@@ -5,6 +5,14 @@ batch of user-visible changes, the patch number with fixes only. The
 number lives in package.json and is read from there everywhere
 (health endpoint, SDK client string, MCP server, About box).
 
+## 0.6.0 — 2026-09-07
+
+- Bundled fonts (Inter, Source Serif 4, JetBrains Mono; Latin subsets,
+  ~150 KB total) so the app looks the same on every platform. Used by
+  default on Windows, where Segoe UI / Palatino Linotype / Consolas read
+  very differently; View → Appearance → Fonts chooses auto, system or
+  bundled anywhere. The terminal refits once fonts load.
+
 ## 0.5.0 — 2026-09-07
 
 - File → Quit Mendophyte stops the server and frees the port; the page

@@ -51,6 +51,16 @@
   --m-group-border: rgba(255, 255, 255, 0.06);
 }
 
+/* Bundled fonts (see main.tsx). Chosen to sit close to the macOS defaults the
+   design was drawn with: Inter for UI text, Source Serif 4 for headings and
+   the wordmark, JetBrains Mono for code and the terminal. */
+:root[data-fonts="bundled"] {
+  --m-font: "Inter Variable", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --m-font-serif: "Source Serif 4 Variable", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --m-font-mono: "JetBrains Mono Variable", ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  font-optical-sizing: auto;
+}
+
 /* ---- Vine, light --------------------------------------------------- */
 :root[data-theme="vine"] {
   --m-bg: #f3efe3;

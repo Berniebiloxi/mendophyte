@@ -47,12 +47,22 @@ export interface UiState {
   uiScale: UiScale;
   /** Apply the workflow preset that matches the agent's phase as it changes. */
   layoutFollowsPhase: boolean;
+  /** Which fonts to use: the platform's, the bundled set, or auto (bundled on Windows, system elsewhere). */
+  fonts: FontChoice;
   /** Set after File → Quit: the server is gone on purpose; stop reconnecting and say so. */
   stopped: boolean;
   toast: string | null;
 }
 
 export type UiScale = "auto" | number;
+export type FontChoice = "auto" | "system" | "bundled";
+/** Windows ships Segoe UI / Palatino Linotype / Consolas, which read very differently from the macOS and Linux defaults; bundled fonts keep the look. */
+export function isWindows(): boolean {
+  return /Windows/i.test(navigator.userAgent);
+}
+export function effectiveFonts(c: FontChoice): "system" | "bundled" {
+  return c === "auto" ? (isWindows() ? "bundled" : "system") : c;
+}
 export const UI_SCALE_STEPS = [0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.5] as const;
 
 /**
@@ -72,7 +82,7 @@ export function effectiveUiScale(s: UiScale): number {
 }
 
 const EVENT_CAP = 1500;
-const LS = { theme: "mendophyte.theme", scheme: "mendophyte.scheme", active: "mendophyte.activeSession", termFont: "mendophyte.termFontSize", uiScale: "mendophyte.uiScale", follow: "mendophyte.layoutFollowsPhase" };
+const LS = { theme: "mendophyte.theme", scheme: "mendophyte.scheme", active: "mendophyte.activeSession", termFont: "mendophyte.termFontSize", uiScale: "mendophyte.uiScale", follow: "mendophyte.layoutFollowsPhase", fonts: "mendophyte.fonts" };
 
 class Store {
   state: UiState;
@@ -98,6 +108,7 @@ class Store {
       uiScale: readScale(safeGet(LS.uiScale)),
       layoutFollowsPhase: safeGet(LS.follow) === "1",
       stopped: false,
+      fonts: readFonts(safeGet(LS.fonts)),
       toast: null,
     };
   }
@@ -110,6 +121,13 @@ class Store {
       /* the socket closing is the confirmation */
     }
     this.set({ stopped: true, connected: false });
+  }
+
+  setFonts(c: FontChoice) {
+    diag(`fonts ${c} (effective ${effectiveFonts(c)})`);
+    safeSet(LS.fonts, c);
+    this.set({ fonts: c });
+    this.applyTheme();
   }
 
   setLayoutFollowsPhase(on: boolean) {
@@ -175,6 +193,7 @@ class Store {
     document.documentElement.dataset.theme = this.state.theme;
     document.documentElement.dataset.scheme = this.state.scheme;
     document.documentElement.style.setProperty("--m-ui-scale", String(effectiveUiScale(this.state.uiScale)));
+    document.documentElement.dataset.fonts = effectiveFonts(this.state.fonts);
   }
 
   toast(msg: string) {
@@ -371,6 +390,9 @@ class Store {
   }
 }
 
+function readFonts(raw: string | null): FontChoice {
+  return raw === "system" || raw === "bundled" ? raw : "auto";
+}
 function readScale(raw: string | null): UiScale {
   if (!raw || raw === "auto") return "auto";
   const n = Number(raw);
