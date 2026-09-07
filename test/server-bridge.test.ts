@@ -271,6 +271,16 @@ test("server bridge: REST + websocket round trip with a fake session", async () 
     assert.equal((await api("DELETE", `/sessions/${id}`)).status, 200);
     await next((m) => m.type === "session.removed" && m.id === id);
     assert.equal(fakes[0].closed, true);
+    // The process keeps emitting while it shuts down; nothing about a removed session may reach clients.
+    const late: any[] = [];
+    const spy = (raw: any) => { const m = JSON.parse(String(raw)); if ((m.type === "session.updated" && m.session?.id === id) || (m.type === "session.event" && m.sessionId === id)) late.push(m); };
+    ws.on("message", spy);
+    fakes[0].emit("end");
+    fakes[0].emit("assistant_text", "late words");
+    await new Promise((r) => setTimeout(r, 100));
+    ws.off("message", spy);
+    assert.equal(late.length, 0, "no frames for a removed session");
+    assert.equal((await api("GET", "/sessions")).json.sessions.some((x: any) => x.id === id), false);
     assert.equal((await api("GET", `/sessions/${id}`)).status, 404);
     assert.equal((await api("POST", `/sessions/${id}/messages`, { text: "x" })).status, 404);
 

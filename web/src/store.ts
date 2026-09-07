@@ -90,6 +90,8 @@ class Store {
   private ws: WebSocket | null = null;
   private retry = 0;
   private replayed = new Set<string>();
+  /** Sessions the server has removed; late frames about them are ignored. */
+  private removed = new Set<string>();
 
   constructor() {
     this.state = {
@@ -229,6 +231,12 @@ class Store {
     // the server records the message as a user_text event and streams it back, so replays keep it
   }
 
+  /** Drop a session the server no longer knows (a 404 on close or on any of its endpoints). */
+  forgetSession(id: string) {
+    this.removed.add(id);
+    this.set((st) => ({ sessions: st.sessions.filter((s) => s.id !== id), activeSessionId: st.activeSessionId === id ? null : st.activeSessionId }));
+  }
+
   private upsertSession(s: SessionSummary) {
     this.set((st) => {
       const i = st.sessions.findIndex((x) => x.id === s.id);
@@ -346,10 +354,12 @@ class Store {
         }
         case "session.created":
         case "session.updated":
+          if (this.removed.has(m.session.id)) return;
           this.upsertSession(m.session);
           if (!this.state.activeSessionId) this.setActive(m.session.id);
           return;
         case "session.removed":
+          this.removed.add(m.id);
           this.set((st) => ({
             sessions: st.sessions.filter((s) => s.id !== m.id),
             activeSessionId: st.activeSessionId === m.id ? null : st.activeSessionId,

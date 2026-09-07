@@ -502,10 +502,21 @@ export class SessionManager extends EventEmitter {
     e.watcher?.close();
     if (e.watchTimer) clearTimeout(e.watchTimer);
     if (e.submissionTimer) clearInterval(e.submissionTimer);
-    e.session.close();
+    if (e.draftTimer) clearTimeout(e.draftTimer);
+    // Forget first, then close: the process still emits end/error/turn while it
+    // shuts down, and nothing from a removed session may reach clients again
+    // (a late session.updated used to resurrect it in the browser).
+    this.entries.delete(id);
+    e.session.removeAllListeners();
+    e.broker.removeAllListeners();
+    e.questions.removeAllListeners();
     e.broker.denyAll("Session removed.");
     e.questions.dismissAll("Session removed.");
-    this.entries.delete(id);
+    try {
+      e.session.close();
+    } catch {
+      /* already gone */
+    }
     this.emit("session.removed", id);
     return true;
   }
@@ -552,6 +563,7 @@ export class SessionManager extends EventEmitter {
   }
 
   private record(entry: Entry, event: SessionEventName, data: unknown): void {
+    if (this.entries.get(entry.summary.id) !== entry) return;
     const ev: SessionEvent = {
       seq: ++entry.seq,
       at: new Date().toISOString(),
@@ -566,7 +578,9 @@ export class SessionManager extends EventEmitter {
 
   private wire(entry: Entry): void {
     const { session, broker, questions, summary } = entry;
-    const updated = () => this.emit("session.updated", summary);
+    const updated = () => {
+      if (this.entries.get(summary.id) === entry) this.emit("session.updated", summary);
+    };
 
     session.on("init", (info: { sessionId: string; model: string; permissionMode: string; tools: string[] }) => {
       summary.sdkSessionId = info.sessionId;

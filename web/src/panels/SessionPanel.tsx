@@ -77,7 +77,7 @@ export function SessionPanel() {
           <div className="row" style={{ marginTop: 8 }}>
             {s.id !== activeSessionId && <button className="btn sm" onClick={() => store.setActive(s.id)}>Make active</button>}
             {s.status === "running" && <button className="btn sm" onClick={() => api.end(s.id).catch((e) => store.toast(e.message))}>End</button>}
-            <button className="btn sm" onClick={() => askConfirm("Force-close and forget this session?") && api.remove(s.id).catch((e) => store.toast(e.message))}>Close</button>
+            <button className="btn sm" onClick={() => askConfirm("Force-close and forget this session?") && api.remove(s.id).catch((e) => { if (/not found|404/i.test(e.message)) store.forgetSession(s.id); else store.toast(e.message); })}>Close</button>
           </div>
           {s.lastError && <div className="tag bad" style={{ marginTop: 6, whiteSpace: "normal", lineHeight: 1.4, padding: "6px 10px" }}>{s.lastError}</div>}
         </div>

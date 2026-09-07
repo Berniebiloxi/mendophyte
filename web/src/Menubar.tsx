@@ -144,7 +144,7 @@ export function Menubar({ api }: { api: DockviewApi | null }) {
             <button disabled={!active || active.status !== "running"} title={active?.status === "ended" ? "Already ended" : "Let the agent finish its turn, then exit"} onClick={() => { if (active) rest.end(active.id).then(() => store.toast("Ending: the agent finishes its turn and exits.")).catch((e) => store.toast(e.message)); close(); }}>
               End session <span className="kbd">{active ? active.status : "no session"}</span>
             </button>
-            <button disabled={!active} onClick={() => { if (active && askConfirm("Force-close this session? Pending approvals are denied.")) rest.remove(active.id).catch((e) => store.toast(e.message)); close(); }}>Close session</button>
+            <button disabled={!active} onClick={() => { if (active && askConfirm("Force-close this session? Pending approvals are denied.")) rest.remove(active.id).catch((e) => { if (/not found|404/i.test(e.message)) store.forgetSession(active.id); else store.toast(e.message); }); close(); }}>Close session</button>
             <hr />
             <button disabled={!active} title="Write a Markdown record of this session (conversation, state, verification, submission) into the artifact home under snapshots/" onClick={() => { if (active) rest.snapshot(active.id).then((r) => store.toast(`Snapshot saved: ${r.path}`)).catch((e) => store.toast(e.message)); close(); }}>
               Save snapshot <span className="kbd">to artifact home</span>

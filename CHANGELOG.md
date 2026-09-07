@@ -5,6 +5,15 @@ batch of user-visible changes, the patch number with fixes only. The
 number lives in package.json and is read from there everywhere
 (health endpoint, SDK client string, MCP server, About box).
 
+## 0.6.4 — 2026-09-07
+
+- Closing a session could leave a ghost in the browser: the agent process
+  emitted its end event just after removal and the manager still had
+  listeners attached, so a late "session updated" frame re-added it,
+  every panel then got "not found", and Close could not remove it again.
+  Listeners are detached before close, late frames are dropped, and a
+  Close that gets 404 forgets the session locally.
+
 ## 0.6.3 — 2026-09-07
 
 - Progress tree: bud connectors are exactly horizontal with a crisp
