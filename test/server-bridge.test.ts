@@ -195,6 +195,12 @@ test("server bridge: REST + websocket round trip with a fake session", async () 
     assert.equal((await api("POST", "/questions/nope", { answers: {} })).status, 404);
     assert.equal((await api("POST", "/questions/nope", {})).status, 400);
 
+    // Page loads on the numeric loopback name are sent to localhost (one origin, one set of browser settings); API calls are not.
+    const nav = await fetch(`http://127.0.0.1:${server.port}/`, { redirect: "manual", headers: { accept: "text/html,*/*" } });
+    assert.equal(nav.status, 302);
+    assert.equal(nav.headers.get("location"), `http://localhost:${server.port}/`);
+    assert.equal((await fetch(`http://127.0.0.1:${server.port}/api/health`)).status, 200);
+
     // Unknown approval id over the socket -> error frame, nothing thrown.
     ws.send(JSON.stringify({ type: "approval.resolve", id: "nope", approved: true }));
     const err = await next((m) => m.type === "error");

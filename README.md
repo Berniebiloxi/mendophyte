@@ -136,8 +136,19 @@ conversation; the session continues with your next message.
 
 **Snapshots.** **File → Save snapshot** writes a Markdown record of the
 session (conversation, last dashboard state, verification runs,
-submission) into the artifact home under `snapshots/`; **File → Export
-session…** downloads the same file. **Prior projects** in the Session
+submission) into the artifact home under `snapshots/`, where the agent
+can read it on the next resume and the Artifacts panel lists it under
+"Session snapshots". **File → Export session…** downloads the same file
+to your Downloads folder, for sharing or handing to someone else.
+Snapshots are records, not save-games: a session cannot be restored into
+the agent from one, but the agent reads them along with Artifacts A–F
+when it resumes.
+
+**Quitting.** **File → Quit Mendophyte** stops the server and frees the
+port. Closing the browser tab does not stop the server; sessions keep
+running and the tab picks them up again when reopened (same URL). Always
+open the app as `http://localhost:<port>`; `127.0.0.1` is redirected
+there, because browsers keep settings and zoom per site name. **Prior projects** in the Session
 panel lists every artifact home with Rename, Move and Delete; a home a
 running session is using is locked until that session ends.
 

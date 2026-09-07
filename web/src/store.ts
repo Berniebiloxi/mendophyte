@@ -47,6 +47,8 @@ export interface UiState {
   uiScale: UiScale;
   /** Apply the workflow preset that matches the agent's phase as it changes. */
   layoutFollowsPhase: boolean;
+  /** Set after File → Quit: the server is gone on purpose; stop reconnecting and say so. */
+  stopped: boolean;
   toast: string | null;
 }
 
@@ -95,8 +97,19 @@ class Store {
       termFontSize: Number(safeGet(LS.termFont)) || 13,
       uiScale: readScale(safeGet(LS.uiScale)),
       layoutFollowsPhase: safeGet(LS.follow) === "1",
+      stopped: false,
       toast: null,
     };
+  }
+
+  async quit() {
+    diag("quit requested from File menu");
+    try {
+      await api.shutdown();
+    } catch {
+      /* the socket closing is the confirmation */
+    }
+    this.set({ stopped: true, connected: false });
   }
 
   setLayoutFollowsPhase(on: boolean) {
@@ -289,6 +302,7 @@ class Store {
     };
     ws.onclose = (ev) => {
       this.set({ connected: false });
+      if (this.state.stopped) return;
       const delay = Math.min(10_000, 500 * 2 ** this.retry++);
       diag(`ws closed code=${ev.code} reason="${ev.reason}" → reconnect in ${delay}ms`);
       setTimeout(() => this.connect(), delay);

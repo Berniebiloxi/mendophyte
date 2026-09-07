@@ -35,6 +35,21 @@ export async function createMendophyteServer(opts: { port: number; host?: string
   const startedAt = new Date().toISOString();
   const diag = opts.diag ?? NULL_LOG;
 
+  // One origin only. Browsers keep localStorage (layout, theme, UI size) and
+  // per-site zoom separately for localhost and 127.0.0.1, so opening the app
+  // by the other name looks like a different, differently-sized app. Page
+  // navigations to the numeric host are sent to localhost.
+  app.use((req, res, next) => {
+    const hostHeader = String(req.headers.host ?? "");
+    const accept = String(req.headers.accept ?? "");
+    if (req.method === "GET" && /^(127\.0\.0\.1|\[::1\]|0\.0\.0\.0)(:|$)/.test(hostHeader) && accept.includes("text/html")) {
+      const p = hostHeader.split(":")[1] ? `:${hostHeader.split(":").pop()}` : "";
+      diag.log("http", `redirecting ${hostHeader}${req.originalUrl} to localhost (same app, one set of browser settings)`);
+      return res.redirect(302, `http://localhost${p}${req.originalUrl}`);
+    }
+    next();
+  });
+
   // Every request, with a summary of the body and the outcome. The debug
   // log's own endpoints are skipped so tailing it doesn't fill it.
   app.use((req, res, next) => {
@@ -143,7 +158,7 @@ export async function createMendophyteServer(opts: { port: number; host?: string
   });
   const addr = http.address();
   const port = typeof addr === "object" && addr ? addr.port : opts.port;
-  diag.log("server", `listening on http://${host}:${port} (pid ${process.pid}, fake sessions: ${process.env.MENDOPHYTE_FAKE_SESSION === "1" ? "yes" : "no"})`);
+  diag.log("server", `listening on http://localhost:${port} (bound to ${host}; pid ${process.pid}; fake sessions: ${process.env.MENDOPHYTE_FAKE_SESSION === "1" ? "yes" : "no"})`);
 
   return {
     url: `http://localhost:${port}`,

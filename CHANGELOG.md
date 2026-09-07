@@ -5,6 +5,16 @@ batch of user-visible changes, the patch number with fixes only. The
 number lives in package.json and is read from there everywhere
 (health endpoint, SDK client string, MCP server, About box).
 
+## 0.5.0 — 2026-09-07
+
+- File → Quit Mendophyte stops the server and frees the port; the page
+  shows that it stopped and stops reconnecting.
+- One origin: page loads on 127.0.0.1 are redirected to localhost. The
+  browser keeps layout, theme, UI size and its own zoom per site, so the
+  two names looked like two differently-sized apps.
+- Session snapshots are listed in the Artifacts panel and open there.
+- UI size menu says when the browser's own zoom is on for this site.
+
 ## 0.4.1 — 2026-09-07
 
 - Project rows wrap in a narrow tile so the name keeps its space and

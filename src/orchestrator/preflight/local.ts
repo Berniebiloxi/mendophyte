@@ -73,6 +73,20 @@ export async function listArtifactHome(artifactHome: string): Promise<{ exists: 
       // vanished between readdir and stat; ignore
     }
   }
+  // Session snapshots live one level down; list them so the Artifacts panel can open them.
+  try {
+    const snapDir = path.join(artifactHome, "snapshots");
+    for (const name of (await readdir(snapDir)).filter((n) => n.endsWith(".md")).sort().reverse()) {
+      try {
+        const st = await stat(path.join(snapDir, name));
+        entries.push({ name: `snapshots/${name}`, bytes: st.size, modified: st.mtime.toISOString(), isDir: false });
+      } catch {
+        /* vanished */
+      }
+    }
+  } catch {
+    /* no snapshots yet */
+  }
   return { exists: true, entries };
 }
 

@@ -74,7 +74,7 @@ export function ArtifactsPanel() {
       <div className="art-side">
         <div className="faint" style={{ padding: "6px 8px", fontSize: 11 }} title={home}>{home.split(/[\\/]/).slice(-2).join("/")}</div>
         {entries.length === 0 && <div className="empty" style={{ padding: 8 }}>No artifacts written yet.</div>}
-        {entries.map((e) => {
+        {entries.filter((e) => !e.name.startsWith("snapshots/")).map((e) => {
           const L = letterOf(e.name);
           return (
             <div key={e.name} className={`art-item${e.name === selected ? " sel" : ""}`} onClick={() => setSelected(e.name)} title={`${e.bytes} bytes · ${new Date(e.modified).toLocaleString()}`}>
@@ -83,6 +83,17 @@ export function ArtifactsPanel() {
             </div>
           );
         })}
+        {entries.some((e) => e.name.startsWith("snapshots/")) && (
+          <>
+            <div className="faint" style={{ padding: "8px 8px 2px", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>Session snapshots</div>
+            {entries.filter((e) => e.name.startsWith("snapshots/")).map((e) => (
+              <div key={e.name} className={`art-item${e.name === selected ? " sel" : ""}`} onClick={() => setSelected(e.name)} title={`${e.bytes} bytes · ${new Date(e.modified).toLocaleString()}`}>
+                <span className="tag">S</span>
+                <span className="grow art-name">{new Date(e.modified).toLocaleString()}</span>
+              </div>
+            ))}
+          </>
+        )}
       </div>
       <div className="art-main">
         <div className="art-head">

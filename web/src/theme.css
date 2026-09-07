@@ -957,3 +957,5 @@ pre.out, .md pre, .modal .cmd { border-radius: 0.625rem; box-shadow: var(--m-cla
 .sess-form > summary::before { content: "▸"; color: var(--m-ink-3); font-size: 0.8rem; }
 .sess-form[open] > summary::before { content: "▾"; }
 .sess-form > :not(summary) { margin-top: 0.5rem; }
+.modal.stopped { border-top: 4px solid var(--m-accent); }
+.modal.stopped .modal-body { padding-bottom: 1.2rem; }

@@ -87,6 +87,9 @@ export function Menubar({ api }: { api: DockviewApi | null }) {
   const termFontSize = useUi((st) => st.termFontSize);
   const uiScale = useUi((st) => st.uiScale);
   const followPhase = useUi((st) => st.layoutFollowsPhase);
+  // Integer device pixel ratios are OS scaling; anything else means the browser's own zoom is on.
+  const dpr = window.devicePixelRatio || 1;
+  const browserZoom = Number.isInteger(dpr) ? null : `${Math.round(dpr * 100)}%`;
   // Re-render when panels open/close so the checkmarks stay honest.
   const [, bump] = useState(0);
   useEffect(() => {
@@ -148,6 +151,10 @@ export function Menubar({ api }: { api: DockviewApi | null }) {
             <button disabled={!active} title="Download the same record as a .md file" onClick={() => { if (active) { diag("export snapshot"); window.open(`/api/sessions/${active.id}/snapshot.md`, "_blank"); } close(); }}>
               Export session… <span className="kbd">.md download</span>
             </button>
+            <hr />
+            <button title="Stop the Mendophyte server and free its port. Sessions end; artifacts stay on disk." onClick={() => { if (askConfirm("Quit Mendophyte? The server stops and its port is freed. Running sessions end (their notes stay in the artifact home).")) void store.quit(); close(); }}>
+              Quit Mendophyte <span className="kbd">stops the server</span>
+            </button>
           </>
         )}
       </Menu>
@@ -200,7 +207,12 @@ export function Menubar({ api }: { api: DockviewApi | null }) {
                 <button key={s} onClick={() => { store.setScheme(s); close(); }}><span><Check on={scheme === s} />Scheme: {s}</span></button>
               ))}
             </SubMenu>
-            <SubMenu label="UI size" hint={uiScale === "auto" ? `auto · ${Math.round(autoUiScale() * 100)}%` : `${Math.round(uiScale * 100)}%`}>
+            <SubMenu label="UI size" hint={`${uiScale === "auto" ? `auto · ${Math.round(autoUiScale() * 100)}%` : `${Math.round(uiScale * 100)}%`}${browserZoom ? ` · zoom ${browserZoom}` : ""}`}>
+              {browserZoom && (
+                <div className="faint" style={{ padding: "0.3rem 0.6rem", maxWidth: "16rem", whiteSpace: "normal" }}>
+                  The browser's own zoom is at {browserZoom} for this site (Ctrl/Cmd+0 resets it). UI size applies on top of it, and Auto sees the zoomed screen width.
+                </div>
+              )}
               <button onClick={() => { store.setUiScale("auto"); close(); }}><span><Check on={uiScale === "auto"} />Auto for this screen</span> <span className="kbd">{Math.round(autoUiScale() * 100)}%</span></button>
               <hr />
               {UI_SCALE_STEPS.map((sc) => (

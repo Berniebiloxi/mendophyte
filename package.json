@@ -1,6 +1,6 @@
 {
   "name": "mendophyte",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "description": "Local dev cockpit for AI-assisted open-source contribution work, built on the Claude Agent SDK.",
   "type": "module",
   "bin": {

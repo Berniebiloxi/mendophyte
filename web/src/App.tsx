@@ -60,6 +60,7 @@ export function App() {
   const saveTimer = useRef<number | null>(null);
   const colorScheme = useColorScheme();
   const toast = useUi((st) => st.toast);
+  const stopped = useUi((st) => st.stopped);
   const nApprovals = useUi((st) => st.approvals.length);
   const nQuestions = useUi((st) => st.questions.length);
 
@@ -103,6 +104,17 @@ export function App() {
       <div className="app-dock">
         <DockviewReact components={components} onReady={onReady} theme={theme} />
       </div>
+      {stopped && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className="modal plain stopped">
+            <div className="modal-head"><h2>Mendophyte has stopped</h2></div>
+            <div className="modal-body stack">
+              <p>The server is shut down and its port is free. Your notes, feedback log, benchmarks and snapshots are on disk in the artifact home.</p>
+              <p className="muted">To start again, run <code>npm start</code> in the Mendophyte folder (or <code>mendophyte</code>), then reload this tab. You can close this tab now.</p>
+            </div>
+          </div>
+        </div>
+      )}
       <ApprovalsModal />
       {toast && (
         <div style={{ position: "fixed", bottom: 14, left: "50%", transform: "translateX(-50%)", zIndex: 90 }} className="card">
