@@ -3,6 +3,8 @@ import { store, useActiveSession, useUi } from "../store.js";
 import type { QuestionAnswers, QuestionView } from "../types.js";
 import { renderInline } from "../markdown.js";
 
+const SEND_KEY = /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘+Enter" : "Ctrl+Enter";
+
 /** Inline-formatted text (bold, code, links) from the agent; sanitized. */
 function Inline({ text, className }: { text: string; className?: string }) {
   return <span className={className} dangerouslySetInnerHTML={{ __html: renderInline(text) }} />;
@@ -168,7 +170,7 @@ export function YourTurnPanel() {
       })}
       {open.length > 0 && (
         <div className="row" style={{ justifyContent: "space-between" }}>
-          <span className="faint">{open.length > 1 ? "All answers go in one message so the agent sees them together. " : ""}⌘/Ctrl+Enter to send</span>
+          <span className="faint">{open.length > 1 ? "All answers go in one message so the agent sees them together. " : ""}{SEND_KEY} to send</span>
           <button className="btn primary sm" disabled={busy || !filled.length} onClick={sendAll}>
             {open.length > 1 ? `Send ${filled.length} of ${open.length} answers` : "Submit"}
           </button>
