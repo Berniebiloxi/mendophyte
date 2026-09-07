@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { api } from "../api.js";
 import { useActiveSession, useEventCount, useLastEvent, useUi } from "../store.js";
 import type { ArtifactEntry } from "../types.js";
@@ -87,13 +87,24 @@ export function SpinePanel() {
     return `M ${x(i - 1)} ${y(i - 1)} Q ${cx} ${cy} ${x(i)} ${y(i)}`;
   };
   const flowing = phase !== null && !complete && phase > 0 ? phase : complete && phase !== null && phase < 5 ? phase + 1 : null;
-  // Label widths, so bud connectors start after the text instead of running through it.
-  const labelW = (t: string) => {
-    const c = document.createElement("canvas").getContext("2d");
-    if (!c) return t.length * 6.4;
-    c.font = `12px ${getComputedStyle(document.documentElement).getPropertyValue("--m-font-serif") || "serif"}`;
-    return c.measureText(t).width;
+  // Label widths come from the rendered <text> elements themselves (measured
+  // after layout, and again once web fonts finish loading), so bud connectors
+  // start after the real text whatever font the platform ends up using.
+  const labelRefs = useRef<(SVGTextElement | null)[]>([]);
+  const [labelWidths, setLabelWidths] = useState<number[]>([]);
+  const measure = () => {
+    const w = labelRefs.current.map((el) => (el ? el.getComputedTextLength() : 0));
+    setLabelWidths((prev) => (prev.length === w.length && prev.every((v, i) => Math.abs(v - w[i]) < 0.5) ? prev : w));
   };
+  useLayoutEffect(measure, [s?.id]);
+  useEffect(() => {
+    let live = true;
+    document.fonts?.ready.then(() => live && measure());
+    return () => {
+      live = false;
+    };
+  }, []);
+  const labelW = (i: number, t: string) => labelWidths[i] || t.length * 6.4;
 
   return (
     <div className="panel spine">
@@ -112,7 +123,7 @@ export function SpinePanel() {
           const done = phase !== null && (p.n < phase || (p.n === phase && complete));
           const now = (phase === p.n && !complete) || (phase === null && working && p.n === 0);
           const label = `${p.n} · ${p.name}`;
-          const labelEnd = x(i) + 16 + labelW(label) + 8;
+          const labelEnd = x(i) + 16 + labelW(i, label) + 8;
           const cls = done ? "node done" : now ? "node now" : "node";
           return (
             <g key={p.n}>
@@ -122,7 +133,7 @@ export function SpinePanel() {
               {/* a leaf on each grown node */}
               <path className={`leaf${done || now ? "" : " dormant"}`} d={`M ${x(i) - 6} ${y(i) - 10} q -14 -14 -4 -26 q 12 6 4 26 z`} />
               <circle className={cls} cx={x(i)} cy={y(i)} r={7} />
-              <text className={`label${done || now ? "" : " dim"}`} x={x(i) + 16} y={y(i) + 4}>
+              <text ref={(el) => { labelRefs.current[i] = el; }} className={`label${done || now ? "" : " dim"}`} x={x(i) + 16} y={y(i) + 4}>
                 {label}
               </text>
               {p.n === 4 && lastRun && (

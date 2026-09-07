@@ -4,3 +4,4 @@ public/
 *.log
 .DS_Store
 .vite/
+test/browser/shots/

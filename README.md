@@ -372,6 +372,7 @@ npm run verify -- --repo /path/to/clone --run      # run the detected set (exit 
 Tests:
 
 ```
+npm run test:browser # drives the built UI in a local Chrome against the fake session; screenshots in test/browser/shots/
 npm test            # unit: guardrail matching, 00-entry.md section extraction
 npm run test:live   # integration against real Claude Code sessions (haiku, a few cents)
 ```

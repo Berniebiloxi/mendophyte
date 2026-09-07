@@ -35,3 +35,27 @@ jobs:
       - name: Built artefacts exist
         shell: bash
         run: test -f dist/cli.js && test -f public/index.html && test -f prompts/00-entry.md
+
+  browser:
+    name: browser walkthrough · ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Drives the built app in the runner's own Chrome and saves screenshots
+      # from each platform, so Windows and Linux renders can be compared.
+      - run: npm run test:browser
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots-${{ matrix.os }}
+          path: test/browser/shots/
+          if-no-files-found: ignore

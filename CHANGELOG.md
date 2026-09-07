@@ -5,6 +5,15 @@ batch of user-visible changes, the patch number with fixes only. The
 number lives in package.json and is read from there everywhere
 (health endpoint, SDK client string, MCP server, About box).
 
+## 0.6.1 — 2026-09-07
+
+- Progress tree: bud connectors are placed from the rendered label
+  widths (re-measured once web fonts load) instead of a canvas estimate
+  taken before the font arrived; on Windows the buds sat on the labels.
+- Browser walkthrough moved into the repo (`npm run test:browser`) and
+  runs in CI on Linux and Windows with the runner's own Chrome, uploading
+  screenshots from each platform.
+
 ## 0.6.0 — 2026-09-07
 
 - Bundled fonts (Inter, Source Serif 4, JetBrains Mono; Latin subsets,
