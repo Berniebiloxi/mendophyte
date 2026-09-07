@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="en" data-scheme="auto">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Mendophyte</title>
+<meta name="description" content="A local cockpit for contributing to open-source projects with an AI agent that teaches while it works. Built on the Claude Agent SDK." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M4 28 C 12 28, 12 12, 18 12 S 26 20, 30 6' fill='none' stroke='%232f5138' stroke-width='2.5' stroke-linecap='round'/%3E%3Ccircle cx='18' cy='12' r='2.6' fill='%233d6b48'/%3E%3Ccircle cx='30' cy='6' r='3' fill='%23c9a227'/%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+/* Same tokens as the app's Vine theme (web/src/theme.css). */
+:root {
+  --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --serif: "Source Serif 4", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --bg: #f3efe3; --bg-2: #ebe6d6; --panel: #fbf9f2; --panel-2: #f5f1e4;
+  --ink: #23271f; --ink-2: #56624f; --ink-3: #8a937f;
+  --border: #d9d2bd; --border-2: #c6bea6;
+  --accent: #2f5138; --accent-2: #3d6b48; --accent-soft: #dce8dc;
+  --verified: #1f6f69; --verified-soft: #d7ebe8;
+  --bloom: #c9a227; --bloom-soft: #f2e6bf;
+  --danger: #9b3b2e; --danger-soft: #f3ddd7;
+  --vine: #2f5138; --vine-dormant: #bfc7b6; --code-bg: #eee9d9;
+  --hi: rgba(255,255,255,.75); --lo: rgba(20,24,18,.07);
+  --clay: 0 1px 2px rgba(20,24,18,.05), 0 10px 26px -12px rgba(20,24,18,.30), inset 0 1px 0 var(--hi), inset 0 -1px 0 var(--lo);
+  --clay-hover: 0 2px 4px rgba(20,24,18,.06), 0 22px 40px -16px rgba(20,24,18,.40), inset 0 1px 0 var(--hi), inset 0 -1px 0 var(--lo);
+  --clay-in: inset 0 2px 5px rgba(20,24,18,.10), inset 0 -1px 0 var(--hi);
+  --r: 14px; --ease: 170ms cubic-bezier(.2,.7,.2,1);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-scheme="light"]) { --dark: 1; } }
+:root[data-scheme="dark"] { --dark: 1; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-scheme="light"]) {
+    --bg: #171b16; --bg-2: #1e241d; --panel: #232a22; --panel-2: #2a322a;
+    --ink: #e8e6dc; --ink-2: #adb8a5; --ink-3: #7c8473;
+    --border: #3a453a; --border-2: #4a574a;
+    --accent: #7fb28a; --accent-2: #97c69f; --accent-soft: #2c3f30;
+    --verified: #66b5ad; --verified-soft: #223a37;
+    --bloom: #e0bc48; --bloom-soft: #3d351a;
+    --danger: #e07a68; --danger-soft: #3f2723;
+    --vine: #7fb28a; --vine-dormant: #46524a; --code-bg: #1b201a;
+    --hi: rgba(255,255,255,.06); --lo: rgba(0,0,0,.35);
+    --clay: 0 1px 2px rgba(0,0,0,.3), 0 12px 28px -12px rgba(0,0,0,.65), inset 0 1px 0 var(--hi), inset 0 -1px 0 var(--lo);
+    --clay-hover: 0 2px 4px rgba(0,0,0,.3), 0 24px 44px -16px rgba(0,0,0,.75), inset 0 1px 0 rgba(255,255,255,.09), inset 0 -1px 0 var(--lo);
+    --clay-in: inset 0 2px 6px rgba(0,0,0,.45), inset 0 -1px 0 var(--hi);
+    color-scheme: dark;
+  }
+}
+:root[data-scheme="dark"] {
+  --bg: #171b16; --bg-2: #1e241d; --panel: #232a22; --panel-2: #2a322a;
+  --ink: #e8e6dc; --ink-2: #adb8a5; --ink-3: #7c8473;
+  --border: #3a453a; --border-2: #4a574a;
+  --accent: #7fb28a; --accent-2: #97c69f; --accent-soft: #2c3f30;
+  --verified: #66b5ad; --verified-soft: #223a37;
+  --bloom: #e0bc48; --bloom-soft: #3d351a;
+  --danger: #e07a68; --danger-soft: #3f2723;
+  --vine: #7fb28a; --vine-dormant: #46524a; --code-bg: #1b201a;
+  --hi: rgba(255,255,255,.06); --lo: rgba(0,0,0,.35);
+  --clay: 0 1px 2px rgba(0,0,0,.3), 0 12px 28px -12px rgba(0,0,0,.65), inset 0 1px 0 var(--hi), inset 0 -1px 0 var(--lo);
+  --clay-hover: 0 2px 4px rgba(0,0,0,.3), 0 24px 44px -16px rgba(0,0,0,.75), inset 0 1px 0 rgba(255,255,255,.09), inset 0 -1px 0 var(--lo);
+  --clay-in: inset 0 2px 6px rgba(0,0,0,.45), inset 0 -1px 0 var(--hi);
+  color-scheme: dark;
+}
+:root[data-scheme="light"] { color-scheme: light; }
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0; font-family: var(--font); font-size: 16px; line-height: 1.55; color: var(--ink);
+  background:
+    radial-gradient(1200px 600px at 10% -10%, color-mix(in srgb, var(--accent-soft) 55%, transparent), transparent 60%),
+    radial-gradient(900px 500px at 110% 110%, color-mix(in srgb, var(--bloom-soft) 45%, transparent), transparent 60%),
+    var(--bg);
+  background-attachment: fixed;
+}
+a { color: var(--accent); }
+code, pre { font-family: var(--mono); font-size: .92em; }
+h1, h2, h3 { font-family: var(--serif); font-weight: 500; line-height: 1.2; margin: 0; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+
+/* menubar-like header */
+.bar {
+  position: sticky; top: 8px; z-index: 10; margin: 8px auto 0; max-width: 1120px; padding: 0 20px;
+}
+.bar-in {
+  display: flex; align-items: center; gap: 14px; height: 44px; padding: 0 14px; border-radius: var(--r);
+  background: color-mix(in srgb, var(--panel) 82%, transparent); backdrop-filter: blur(10px) saturate(1.2); -webkit-backdrop-filter: blur(10px) saturate(1.2);
+  border: 1px solid var(--lo); box-shadow: var(--clay);
+}
+.wordmark { font-family: var(--serif); font-size: 20px; display: inline-flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; }
+.wordmark svg { width: 44px; height: 24px; }
+.wordmark svg path { fill: none; stroke: var(--vine); stroke-width: 2; stroke-linecap: round; }
+.wordmark svg circle { fill: var(--accent-2); }
+.wordmark svg circle.bloom { fill: var(--bloom); }
+.bar nav { display: flex; gap: 2px; margin-left: 6px; }
+.bar nav a, .bar button { font: inherit; font-size: 14px; color: var(--ink); text-decoration: none; background: transparent; border: 0; padding: 6px 10px; border-radius: 8px; cursor: pointer; }
+.bar nav a:hover, .bar button:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.bar .right { margin-left: auto; display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--ink-2); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--verified); display: inline-block; box-shadow: 0 0 0 3px color-mix(in srgb, var(--verified) 20%, transparent); }
+
+/* hero */
+.hero { display: grid; grid-template-columns: 1.1fr .9fr; gap: 28px; align-items: center; padding: 56px 0 28px; }
+.hero h1 { font-size: clamp(34px, 5vw, 56px); letter-spacing: -.01em; }
+.hero h1 em { font-style: normal; color: var(--accent); }
+.hero p.lead { font-size: 18px; color: var(--ink-2); max-width: 52ch; }
+.tile {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 55%, var(--panel-2)), var(--panel-2));
+  border: 1px solid var(--lo); border-radius: var(--r); box-shadow: var(--clay); transition: box-shadow var(--ease), transform var(--ease), border-color var(--ease);
+}
+.tile:hover { box-shadow: var(--clay-hover); border-color: var(--border-2); }
+.install { padding: 14px 16px; }
+.install .k { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-2); font-weight: 600; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
+pre.cmd { margin: 0; padding: 12px 14px; background: var(--code-bg); border: 1px solid var(--lo); border-radius: 10px; box-shadow: var(--clay-in); overflow: auto; white-space: pre; font-size: 13.5px; line-height: 1.6; }
+.btn { font: inherit; font-size: 13px; border-radius: 10px; padding: 6px 12px; cursor: pointer; color: var(--ink);
+  border: 1px solid color-mix(in srgb, var(--border-2) 70%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 70%, var(--panel-2)), var(--panel-2));
+  box-shadow: 0 1px 1px rgba(20,24,18,.06), 0 4px 10px -6px rgba(20,24,18,.30), inset 0 1px 0 var(--hi), inset 0 -1px 0 var(--lo);
+  transition: transform var(--ease), box-shadow var(--ease); }
+.btn:hover { transform: translateY(-1px); box-shadow: var(--clay-hover); }
+.btn:active { transform: translateY(1px); box-shadow: var(--clay-in); }
+.btn.primary { background: linear-gradient(180deg, var(--accent-2), var(--accent)); color: #fff; border-color: color-mix(in srgb, var(--accent) 80%, black); }
+.btn.sm { padding: 3px 9px; font-size: 12px; }
+.tag { display: inline-block; padding: 1px 9px; border-radius: 999px; font-size: 12px; line-height: 18px; background: var(--bg-2); border: 1px solid var(--border); color: var(--ink-2); white-space: nowrap; }
+.tag.ok { background: var(--verified-soft); border-color: transparent; color: var(--verified); }
+.tag.bloom { background: var(--bloom-soft); border-color: transparent; color: var(--bloom); }
+.tag.bad { background: var(--danger-soft); border-color: transparent; color: var(--danger); }
+.tag.accent { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
+
+.shot { border-radius: var(--r); overflow: hidden; border: 1px solid var(--lo); box-shadow: var(--clay); background: var(--panel); }
+.shot img { display: block; width: 100%; height: auto; }
+
+section { padding: 36px 0; }
+section h2 { font-size: 30px; margin-bottom: 6px; }
+section .sub { color: var(--ink-2); margin: 0 0 18px; max-width: 70ch; }
+
+/* bento */
+.bento { display: grid; grid-template-columns: repeat(12, 1fr); gap: 14px; }
+.bento .tile { padding: 18px 20px; }
+.bento .tile h3 { font-size: 20px; margin-bottom: 6px; }
+.bento .tile p { margin: 0; color: var(--ink-2); font-size: 15px; }
+.span-4 { grid-column: span 4; } .span-6 { grid-column: span 6; } .span-8 { grid-column: span 8; } .span-12 { grid-column: span 12; }
+
+/* phases: interactive vine */
+.phases { display: grid; grid-template-columns: 300px 1fr; gap: 22px; align-items: start; }
+.vine-tile { padding: 12px 8px 8px; }
+.vine-tile svg { width: 100%; height: auto; display: block; }
+.vine-path { fill: none; stroke: var(--vine-dormant); stroke-width: 3; stroke-linecap: round; }
+.vine-grown { fill: none; stroke: var(--vine); stroke-width: 3; stroke-linecap: round; transition: stroke-dasharray .9s ease; }
+.node { fill: var(--panel); stroke: var(--vine-dormant); stroke-width: 2.5; cursor: pointer; transition: fill var(--ease), stroke var(--ease); }
+.node.done { fill: var(--vine); stroke: var(--vine); }
+.node.now { fill: var(--accent-2); stroke: var(--vine); filter: drop-shadow(0 0 4px color-mix(in srgb, var(--accent-2) 80%, transparent)); }
+.glow { fill: var(--accent-2); opacity: .35; filter: blur(6px); animation: glow 2.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes glow { 0%,100% { opacity:.25; transform: scale(.9);} 50% { opacity:.6; transform: scale(1.35);} }
+.pulse { fill: none; stroke: var(--accent-2); stroke-width: 2; opacity: 0; animation: pulse 2.2s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes pulse { 0% { opacity:.7; transform: scale(.6);} 100% { opacity:0; transform: scale(1.9);} }
+.leaf { fill: var(--accent-2); opacity: .85; } .leaf.dormant { fill: var(--vine-dormant); opacity: .6; }
+.label { font-size: 12px; fill: var(--ink); font-family: var(--serif); cursor: pointer; paint-order: stroke fill; stroke: var(--panel); stroke-width: 4px; stroke-linejoin: round; }
+.label.dim { fill: var(--ink-3); }
+.bud { fill: var(--panel); stroke: var(--bloom); stroke-width: 1.5; } .bud.open { fill: var(--bloom); }
+.bud-link { stroke: var(--vine-dormant); stroke-width: 1px; stroke-dasharray: 2 3; vector-effect: non-scaling-stroke; shape-rendering: crispEdges; } .bud-link.open { stroke-dasharray: none; }
+.budlabel { font-size: 9.5px; fill: var(--ink-2); font-family: var(--mono); }
+.flow { fill: none; stroke: var(--bloom); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 12 88; animation: flow 1.8s linear infinite; }
+@keyframes flow { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
+.phase-card { padding: 20px 22px; min-height: 330px; }
+.phase-card .kicker { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.phase-card h3 { font-size: 26px; }
+.phase-card p { color: var(--ink-2); margin: 10px 0; }
+.phase-card ul { margin: 8px 0 0; padding-left: 18px; color: var(--ink-2); }
+.phase-card li { margin: 4px 0; }
+.phase-card li b { color: var(--ink); }
+.yt { margin-top: 14px; padding: 10px 12px; border-radius: 12px; background: var(--panel); border: 1px solid var(--lo); box-shadow: var(--clay), inset 3px 0 0 var(--bloom); font-size: 14px; }
+.yt .k { font-size: 11px; color: var(--bloom); background: var(--bloom-soft); border-radius: 999px; padding: 1px 8px; display: inline-block; margin-bottom: 4px; }
+.phase-nav { display: flex; gap: 8px; margin-top: 16px; align-items: center; flex-wrap: wrap; }
+.phase-nav .faint { color: var(--ink-3); font-size: 13px; margin-left: auto; }
+
+/* tabs of screenshots */
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.tabs button { font: inherit; font-size: 14px; padding: 6px 12px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: var(--ink-2); cursor: pointer; transition: background var(--ease), color var(--ease); }
+.tabs button:hover { background: color-mix(in srgb, var(--panel) 60%, transparent); color: var(--ink); }
+.tabs button[aria-selected="true"] { background: var(--panel); color: var(--ink); border-color: var(--lo); box-shadow: var(--clay); }
+.tabpanel { display: none; } .tabpanel[data-active] { display: block; }
+.tabpanel .cap { color: var(--ink-2); font-size: 14px; margin: 10px 4px 0; }
+
+/* guardrails */
+.rails { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.modal-demo { padding: 16px 18px; border-top: 4px solid var(--danger); }
+.modal-demo h3 { font-size: 20px; }
+.cmd-box { margin: 10px 0; padding: 10px 12px; background: var(--code-bg); border: 1px solid var(--lo); border-radius: 10px; font-family: var(--mono); font-size: 13px; box-shadow: var(--clay-in); }
+.rail-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.rail-list li { display: flex; gap: 10px; align-items: baseline; font-size: 15px; }
+.rail-list code { background: var(--code-bg); padding: 1px 6px; border-radius: 6px; }
+
+/* footer */
+footer { padding: 30px 0 50px; color: var(--ink-2); font-size: 14px; }
+footer .row { display: flex; gap: 18px; flex-wrap: wrap; }
+
+@media (max-width: 900px) {
+  .hero { grid-template-columns: 1fr; }
+  .phases { grid-template-columns: 1fr; }
+  .rails { grid-template-columns: 1fr; }
+  .span-4, .span-6, .span-8 { grid-column: span 12; }
+  .bar nav { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="bar"><div class="bar-in">
+  <a class="wordmark" href="#top" aria-label="Mendophyte">
+    <svg viewBox="0 0 120 64" aria-hidden="true"><path d="M4 56 C 30 56, 30 20, 56 20 S 90 44, 116 12"/><circle cx="56" cy="20" r="4"/><circle cx="90" cy="44" r="3.5"/><circle class="bloom" cx="116" cy="12" r="5"/></svg>
+    Mendophyte
+  </a>
+  <nav>
+    <a href="#how">How a session goes</a>
+    <a href="#see">What you see</a>
+    <a href="#rails">Guardrails</a>
+    <a href="#install">Install</a>
+    <a href="https://github.com/Berniebiloxi/mendophyte">GitHub</a>
+  </nav>
+  <div class="right">
+    <button id="scheme" title="Light / dark">◐ auto</button>
+    <span><span class="dot"></span> v<span id="ver">…</span></span>
+  </div>
+</div></div>
+
+<main class="wrap" id="top">
+  <section class="hero">
+    <div>
+      <h1>Contribute to open source with an agent that <em>teaches while it works</em>.</h1>
+      <p class="lead">Mendophyte is a local cockpit built on the Claude Agent SDK. It walks a real contribution from first look to pull request, hands the learning-dense steps back to you, and never does anything irreversible without asking.</p>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:14px">
+        <a class="btn primary" href="#install">Install in four commands</a>
+        <a class="btn" href="https://github.com/Berniebiloxi/mendophyte">Source on GitHub</a>
+      </div>
+      <p style="color:var(--ink-3); font-size:13px; margin-top:14px">Runs on your machine against your own Claude Code login. No hosting, no account. Linux, macOS, Windows.</p>
+    </div>
+    <div class="tile install">
+      <div class="k"><span>Install</span><button class="btn sm" data-copy="install">Copy</button></div>
+<pre class="cmd" id="install-cmd">git clone https://github.com/Berniebiloxi/mendophyte.git
+cd mendophyte
+npm ci
+npm start</pre>
+      <div class="k" style="margin-top:12px"><span>Update</span><button class="btn sm" data-copy="update">Copy</button></div>
+<pre class="cmd" id="update-cmd">git pull
+npm ci
+npm start -- --replace</pre>
+    </div>
+  </section>
+
+  <div class="shot"><img src="media/cockpit-dark.png" alt="Mendophyte during a real session on the langchain repository: the progress tree at phase 5, a rendered resume check in the conversation, a your-turn card and the feedback log" loading="eager" /></div>
+
+  <section id="how">
+    <h2>How a session goes</h2>
+    <p class="sub">Six phases, read by the agent from six plain Markdown files you can read too. Click a phase on the vine, or let it grow.</p>
+    <div class="phases">
+      <div class="tile vine-tile">
+        <svg id="vine" viewBox="0 0 250 400" role="img" aria-label="The six phases as a vine"></svg>
+      </div>
+      <div class="tile phase-card" id="phase-card"></div>
+    </div>
+  </section>
+
+  <section id="see">
+    <h2>What you see</h2>
+    <p class="sub">Fifteen dockable panels. Drag, split, float, or pick a workflow preset and let the layout follow the phase.</p>
+    <div class="tabs" role="tablist" id="tabs"></div>
+    <div id="tabpanels"></div>
+  </section>
+
+  <section id="rails">
+    <h2>Guardrails you can see</h2>
+    <p class="sub">The agent's shell commands pass through a pattern check before they run. Anything on this list stops in a modal that shows the exact command and where it runs. The agent cannot proceed until you decide, and a decline reaches it with your reason.</p>
+    <div class="rails">
+      <div class="tile modal-demo">
+        <div style="display:flex; justify-content:space-between; align-items:center"><h3>Create a git commit</h3><span class="tag" style="background:var(--bloom-soft); color:var(--bloom); border-color:transparent">needs your go-ahead</span></div>
+        <p style="color:var(--ink-2); font-size:14px; margin:6px 0">The agent wants to run this in <code>~/Projects/seatsniper</code>. Standing guardrail: <code>git-commit</code>.</p>
+        <div class="cmd-box">git commit -m "fix: reject an unreadable days: filter instead of dropping it silently"</div>
+        <div style="display:flex; gap:8px; justify-content:flex-end"><button class="btn">Decline</button><button class="btn primary">Run this exact command</button></div>
+      </div>
+      <ul class="tile rail-list" style="padding:16px 18px">
+        <li><span class="tag bad">critical</span> force-push, history rewrite (<code>--amend</code>, <code>rebase</code>), hard reset, recursive delete</li>
+        <li><span class="tag" style="background:var(--bloom-soft); color:var(--bloom); border-color:transparent">confirm</span> <code>git commit</code>, <code>git push</code>, opening a pull request</li>
+        <li><span class="tag" style="background:var(--bloom-soft); color:var(--bloom); border-color:transparent">confirm</span> any other write to the forge: issues, comments, reviews, forks, releases, mutating <code>gh api</code> calls</li>
+        <li><span class="tag ok">free</span> reading, searching, running the project's own tests, <code>gh</code> and <code>git</code> reads</li>
+        <li><span class="tag accent">hook</span> enforced as a Claude Code PreToolUse hook, so it holds even in bypass-permissions mode</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="install">
+    <h2>Install</h2>
+    <p class="sub">Four commands. Then point it at a clone of the project you want to help.</p>
+    <div class="bento">
+      <div class="tile span-4"><h3>You need</h3><p>Node.js 20.19 or newer. Claude Code installed and logged in. git and a clone. The GitHub CLI logged in is optional but moves you to full forge access.</p></div>
+      <div class="tile span-4"><h3>Then</h3><p><b>Session</b> panel → paste the clone's path → <b>Start session</b>. Pre-flight runs, the agent reads the entry prompt and asks you two questions in <b>Your turn</b>.</p></div>
+      <div class="tile span-4"><h3>Coming back</h3><p><b>File → Open project…</b> lists every repository you have worked on. The agent reads its own notes and asks how to continue.</p></div>
+      <div class="tile span-6"><h3>Updating</h3><p><code>git pull && npm ci && npm start -- --replace</code>. The running instance hands over to the new code. Notes stay on disk; reopen the project.</p></div>
+      <div class="tile span-6"><h3>If something looks wrong</h3><p><b>Help → Debug log → Mark this moment</b>, then send the file. Every request, event, click and error is in it, with tokens redacted. Most fixes so far came straight from one of those.</p></div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="row">
+      <a href="https://github.com/Berniebiloxi/mendophyte">GitHub</a>
+      <a href="https://github.com/Berniebiloxi/mendophyte/blob/main/CHANGELOG.md">Changelog</a>
+      <a href="https://github.com/Berniebiloxi/mendophyte/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+      <a href="https://github.com/Berniebiloxi/mendophyte/tree/main/prompts">The meta-prompt</a>
+      <span style="margin-left:auto">MIT</span>
+    </div>
+  </footer>
+</main>
+
+<script>
+// ---- scheme toggle (same three states as the app)
+(function () {
+  const b = document.getElementById("scheme");
+  const order = ["auto", "light", "dark"];
+  let cur = localStorage.getItem("mendophyte.site.scheme") || "auto";
+  const apply = () => { document.documentElement.dataset.scheme = cur; b.textContent = (cur === "dark" ? "● " : cur === "light" ? "○ " : "◐ ") + cur; };
+  b.onclick = () => { cur = order[(order.indexOf(cur) + 1) % order.length]; localStorage.setItem("mendophyte.site.scheme", cur); apply(); };
+  apply();
+})();
+
+// ---- version from the repo's package.json
+fetch("https://raw.githubusercontent.com/Berniebiloxi/mendophyte/main/package.json").then(r => r.json()).then(p => { document.getElementById("ver").textContent = p.version; }).catch(() => { document.getElementById("ver").textContent = "0.x"; });
+
+// ---- copy buttons
+for (const btn of document.querySelectorAll("[data-copy]")) {
+  btn.onclick = async () => {
+    const txt = document.getElementById(btn.dataset.copy + "-cmd").textContent;
+    try { await navigator.clipboard.writeText(txt); btn.textContent = "Copied"; setTimeout(() => (btn.textContent = "Copy"), 1200); } catch { btn.textContent = "Select & copy"; }
+  };
+}
+
+// ---- the vine: same geometry as the app's Progress panel
+const PHASES = [
+  { n: 0, name: "Entry", buds: [], title: "Entry", text: "Pre-flight runs on your machine before the agent starts: forge access, repository health, AI-policy and CLA files, notes from earlier sessions. The agent gets those as observed facts, then asks two gating questions.", items: ["<b>Capability tier</b>: full forge access with the GitHub CLI logged in, partial without it, local clone only offline.", "<b>Resume check</b>: if notes A–F exist for this repository, the agent reads them and confirms how to continue."], yt: "How much experience do you have reading other people's code? None / Some / Experienced." },
+  { n: 1, name: "Recon", buds: ["A"], title: "Recon", text: "What the project is, how it is built and tested, how it wants contributions. Read from the repository and the forge, never assumed. Written to Artifact A.", items: ["<b>Conventions</b>: machine-readable config first, then the project's own instructions to agents, then docs, then recent history.", "<b>Scale</b>: tracked files by extension and directory, so the gut check is grounded."], yt: null },
+  { n: 2, name: "Orientation", buds: ["D"], title: "Orientation", text: "Where the fragile parts are. Mendophyte computes churn, fix clusters and marker density from git history and hands them to the agent as a tool, so no turns are spent re-deriving them. Terms you meet go into the glossary, Artifact D.", items: ["<b>Fragility map</b>: shown as a heat overlay in the Files panel too.", "<b>Glossary</b>: every project-specific term, defined when it first appears."], yt: null },
+  { n: 3, name: "Triage", buds: ["B"], title: "Triage", text: "Candidates ranked against named criteria, shown as a board. You pick. The agent then does a deep pass on the chosen task and reports its danger level honestly.", items: ["<b>Criteria as chips</b>: reproducibility, scope, blast radius, maintainer receptiveness, each positive, negative or unobserved.", "<b>Danger gauge</b>: ripples, waves or storm, with the reason."], yt: "Which candidate should go into the deep pass?" },
+  { n: 4, name: "Fix", buds: ["C"], title: "Fix", text: "The mechanism first, then the change. The diff stays locked until you have said where you think the bug lives. The failing test is yours to write. Verification runs the project's own checks and reports real exit codes.", items: ["<b>Handoffs</b>: your hypothesis, your located line, your test, before the agent shows its work.", "<b>Benchmarks</b> for performance work: distributions with a noise-aware verdict, never a single number."], yt: "State your hypothesis about where the bug lives, and why." },
+  { n: 5, name: "Submission", buds: ["E", "F"], title: "Submission", text: "Commit, push and pull request, each behind a confirmation. Template compliance and DCO checked against the real branch. CI polled from the forge. Lessons from the review go into the feedback log, Artifact F, which every later session reads first.", items: ["<b>Submission panel</b>: the PR, its checks, template items, branch sync.", "<b>Patience is the default</b>: one polite check-in after a week of silence, not sooner."], yt: "Review the PR description draft and push back on anything that misstates why the fix is safe." },
+];
+const svg = document.getElementById("vine");
+const card = document.getElementById("phase-card");
+const W = 250, H = 400, yTop = 34, yBottom = H - 30;
+const x = i => 58 + (i % 2 === 0 ? 0 : 22);
+const y = i => yBottom - (i * (yBottom - yTop)) / 5;
+let d = `M ${x(0)} ${y(0)}`;
+for (let i = 1; i <= 5; i++) { const cx = (x(i - 1) + x(i)) / 2 + (i % 2 === 0 ? -26 : 26); const cy = (y(i - 1) + y(i)) / 2; d += ` Q ${cx} ${cy} ${x(i)} ${y(i)}`; }
+const seg = i => { const cx = (x(i - 1) + x(i)) / 2 + (i % 2 === 0 ? -26 : 26); const cy = (y(i - 1) + y(i)) / 2; return `M ${x(i - 1)} ${y(i - 1)} Q ${cx} ${cy} ${x(i)} ${y(i)}`; };
+let phase = 0, timer = null;
+function render() {
+  const grown = Math.min(1, (phase + 0.45) / 5) * 1000;
+  let s = `<path class="vine-path" d="${d}"/><path class="vine-grown" d="${d}" pathLength="1000" stroke-dasharray="${grown} 1000"/>`;
+  if (phase > 0) s += `<path class="flow" d="${seg(phase)}" pathLength="100"/>`;
+  PHASES.forEach((p, i) => {
+    const done = i < phase, now = i === phase;
+    const lx = x(i) + 16;
+    s += `<g data-i="${i}">`;
+    if (now) s += `<circle class="glow" cx="${x(i)}" cy="${y(i)}" r="11"/><circle class="pulse" cx="${x(i)}" cy="${y(i)}" r="9"/>`;
+    s += `<path class="leaf${done || now ? "" : " dormant"}" d="M ${x(i) - 6} ${y(i) - 10} q -14 -14 -4 -26 q 12 6 4 26 z"/>`;
+    s += `<circle class="node${done ? " done" : now ? " now" : ""}" cx="${x(i)}" cy="${y(i)}" r="7"/>`;
+    s += `<text class="label${done || now ? "" : " dim"}" x="${lx}" y="${y(i) + 4}">${p.n} · ${p.name}</text>`;
+    const labelEnd = lx + (p.n + " · " + p.name).length * 6.6 + 8;
+    p.buds.forEach((b, k) => {
+      const bx = Math.max(labelEnd + 14, x(i) + 120) + k * 22, by = y(i), open = i < phase || (i === phase && phase > 0);
+      s += `<line class="bud-link${open ? " open" : ""}" x1="${k === 0 ? labelEnd : bx - 17}" y1="${by}" x2="${bx - 6}" y2="${by}"/>`;
+      s += `<circle class="bud${open ? " open" : ""}" cx="${bx}" cy="${by}" r="4.5"/><text class="budlabel" x="${bx - 3}" y="${by + 17}">${b}</text>`;
+    });
+    s += `</g>`;
+  });
+  svg.innerHTML = s;
+  const p = PHASES[phase];
+  card.innerHTML = `
+    <div class="kicker"><span class="tag accent">phase ${p.n} of 5</span>${p.buds.length ? `<span class="tag bloom">writes artifact ${p.buds.join(" and ")}</span>` : ""}</div>
+    <h3>${p.title}</h3>
+    <p>${p.text}</p>
+    <ul>${p.items.map(i => `<li>${i}</li>`).join("")}</ul>
+    ${p.yt ? `<div class="yt"><span class="k">your turn</span><div>${p.yt}</div></div>` : ""}
+    <div class="phase-nav">
+      <button class="btn sm" id="prev" ${phase === 0 ? "disabled" : ""}>← back</button>
+      <button class="btn sm primary" id="next">${phase === 5 ? "start over" : "next phase →"}</button>
+      <button class="btn sm" id="auto">${timer ? "pause" : "let it grow"}</button>
+      <span class="faint">The real tree follows the agent as it opens each phase's prompt.</span>
+    </div>`;
+  document.getElementById("prev").onclick = () => { stop(); phase = Math.max(0, phase - 1); render(); };
+  document.getElementById("next").onclick = () => { stop(); phase = (phase + 1) % 6; render(); };
+  document.getElementById("auto").onclick = () => { timer ? stop() : start(); render(); };
+  for (const g of svg.querySelectorAll("g[data-i]")) g.onclick = () => { stop(); phase = Number(g.dataset.i); render(); };
+}
+function start() { timer = setInterval(() => { phase = (phase + 1) % 6; render(); }, 3200); }
+function stop() { if (timer) { clearInterval(timer); timer = null; } }
+render();
+new IntersectionObserver((es) => { if (es[0].isIntersecting && !timer && phase === 0) { start(); render(); } }, { threshold: .5 }).observe(svg);
+
+// ---- screenshot tabs
+const SHOTS = [
+  ["Rendered replies", "media/03b-rich-reply.png", "The agent's Markdown becomes titled boxes and real tables; the progress tree glows at the current phase."],
+  ["Triage board", "media/04b-triage-deep.png", "The chosen task after the deep pass, with the danger gauge; the diff stays locked until you state a hypothesis."],
+  ["Confirmation modal", "media/05-approval-modal.png", "A git commit paused for your go-ahead, with the exact command and a place to say why if you decline."],
+  ["Benchmarks", "media/07g-benchmark.png", "Baseline versus after as distributions with whiskers and a verdict, plus your terminal and the feedback log."],
+  ["Files and fragility", "media/07b-files-and-viewer.png", "Tracked files with the churn overlay and a read-only viewer; artifacts rendered on the right."],
+  ["Dark, Vine theme", "media/09-vine-dark.png", "The same layout in the dark scheme with the Debug log panel open."],
+];
+const tabs = document.getElementById("tabs"), panels = document.getElementById("tabpanels");
+SHOTS.forEach(([name, src, cap], i) => {
+  const b = document.createElement("button"); b.role = "tab"; b.textContent = name; b.setAttribute("aria-selected", i === 0 ? "true" : "false"); b.onclick = () => select(i); tabs.appendChild(b);
+  const p = document.createElement("div"); p.className = "tabpanel"; if (i === 0) p.dataset.active = "1";
+  p.innerHTML = `<div class="shot"><img src="${src}" alt="${cap}" loading="lazy"/></div><div class="cap">${cap}</div>`; panels.appendChild(p);
+});
+function select(i) { [...tabs.children].forEach((b, k) => b.setAttribute("aria-selected", k === i ? "true" : "false")); [...panels.children].forEach((p, k) => { if (k === i) p.dataset.active = "1"; else delete p.dataset.active; }); }
+</script>
+</body>
+</html>

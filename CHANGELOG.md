@@ -5,6 +5,17 @@ batch of user-visible changes, the patch number with fixes only. The
 number lives in package.json and is read from there everywhere
 (health endpoint, SDK client string, MCP server, About box).
 
+## 0.6.5 — 2026-09-07
+
+- README rewritten as scannable tables: what it does, requirements,
+  install, update (`git pull && npm ci && npm start -- --replace`), the
+  controls, the panels, symptoms and fixes. The long reference material
+  moved to docs/ARCHITECTURE.md.
+- A landing page in the app's own theme at
+  https://berniebiloxi.github.io/mendophyte/ with an interactive walk
+  through the six phases, screenshots, the guardrail list and install
+  and update commands (docs/index.html, served by GitHub Pages).
+
 ## 0.6.4 — 2026-09-07
 
 - Closing a session could leave a ghost in the browser: the agent process

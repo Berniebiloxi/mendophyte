@@ -1,6 +1,6 @@
 {
   "name": "mendophyte",
-  "version": "0.6.4",
+  "version": "0.6.5",
   "description": "Local dev cockpit for AI-assisted open-source contribution work, built on the Claude Agent SDK.",
   "type": "module",
   "bin": {
@@ -75,7 +75,7 @@
     "type": "git",
     "url": "git+https://github.com/Berniebiloxi/mendophyte.git"
   },
-  "homepage": "https://github.com/Berniebiloxi/mendophyte#readme",
+  "homepage": "https://berniebiloxi.github.io/mendophyte/",
   "bugs": {
     "url": "https://github.com/Berniebiloxi/mendophyte/issues"
   }
